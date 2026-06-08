@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySession } from "@/lib/session";
+import {
+  SESSION_COOKIE_NAME,
+  verifySession,
+} from "@/lib/sessionToken";
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -20,7 +23,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (PUBLIC_PATHS.includes(pathname)) {
-    const token = request.cookies.get("family_cup_session")?.value;
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
     if (token) {
       const session = await verifySession(token);
       if (session) {
@@ -30,7 +33,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get("family_cup_session")?.value;
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
