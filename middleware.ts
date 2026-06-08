@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import {
-  SESSION_COOKIE_NAME,
-  verifySession,
-} from "@/lib/sessionToken";
 
+const SESSION_COOKIE_NAME = "family_cup_session";
 const PUBLIC_PATHS = ["/login"];
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
@@ -23,28 +20,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (PUBLIC_PATHS.includes(pathname)) {
-    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-    if (token) {
-      const session = await verifySession(token);
-      if (session) {
-        return NextResponse.redirect(new URL("/", request.url));
-      }
-    }
     return NextResponse.next();
   }
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  const session = await verifySession(token);
-  if (!session) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  if (pathname.startsWith("/admin") && !session.is_admin) {
-    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
