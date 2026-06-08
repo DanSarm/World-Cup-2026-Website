@@ -1,0 +1,92 @@
+import { isKnockoutStage, type Match } from "./types";
+import {
+  previewPickRewards,
+  DEFAULT_SCORING_CONFIG,
+} from "./scoringConfig";
+
+export type { PickRewardPreview, ScoringConfig } from "./scoringConfig";
+export {
+  previewPickRewards,
+  DEFAULT_SCORING_CONFIG,
+} from "./scoringConfig";
+
+export interface BonusPill {
+  label: string;
+}
+
+/** User-facing bonus pills — no odds or probabilities. */
+export function getBonusPills(match: Match): BonusPill[] {
+  const pills: BonusPill[] = [];
+
+  if (isKnockoutStage(match.stage)) {
+    if ((match.home_advance_bonus ?? 0) > 0) {
+      pills.push({
+        label: `${shortLabel(match.home_team?.short_name, match.home_label)} +${match.home_advance_bonus}`,
+      });
+    }
+    if ((match.away_advance_bonus ?? 0) > 0) {
+      pills.push({
+        label: `${shortLabel(match.away_team?.short_name, match.away_label)} +${match.away_advance_bonus}`,
+      });
+    }
+  } else {
+    if ((match.home_win_bonus ?? 0) > 0) {
+      pills.push({
+        label: `${shortLabel(match.home_team?.short_name, match.home_label)} +${match.home_win_bonus}`,
+      });
+    }
+    if ((match.draw_bonus ?? 0) > 0) {
+      pills.push({ label: `Draw +${match.draw_bonus}` });
+    }
+    if ((match.away_win_bonus ?? 0) > 0) {
+      pills.push({
+        label: `${shortLabel(match.away_team?.short_name, match.away_label)} +${match.away_win_bonus}`,
+      });
+    }
+  }
+
+  return pills;
+}
+
+export function hasAnyBonus(match: Match): boolean {
+  return getBonusPills(match).length > 0;
+}
+
+function shortLabel(shortName?: string, fallback?: string): string {
+  const name = shortName ?? fallback ?? "Team";
+  return name.length > 14 ? name.slice(0, 12) + "…" : name;
+}
+
+export const BONUS_ADMIN_GUIDE = [
+  { label: "Even match", home: 0, draw: 0, away: 0, homeAdv: 0, awayAdv: 0 },
+  { label: "Sneaky pick", home: 0, draw: 1, away: 1, homeAdv: 0, awayAdv: 1 },
+  { label: "Brave pick", home: 0, draw: 2, away: 2, homeAdv: 0, awayAdv: 2 },
+  { label: "Shock pick", home: 0, draw: 4, away: 4, homeAdv: 0, awayAdv: 4 },
+  { label: "Miracle pick", home: 0, draw: 6, away: 6, homeAdv: 0, awayAdv: 6 },
+  { label: "Impossible pick", home: 0, draw: 8, away: 8, homeAdv: 0, awayAdv: 8 },
+] as const;
+
+/** @deprecated use previewPickRewards */
+export function projectPickPoints(
+  match: Match,
+  predHome: number,
+  predAway: number,
+  predWinnerId?: string | null,
+  config: import("./scoringConfig").ScoringConfig = DEFAULT_SCORING_CONFIG
+) {
+  const preview = previewPickRewards(
+    match,
+    predHome,
+    predAway,
+    config,
+    predWinnerId
+  );
+  return {
+    resultPoints: preview.resultOnlyPoints,
+    exactPoints: preview.maxPoints,
+    withMarginPoints:
+      match.stage === "group" && predHome !== predAway
+        ? preview.resultOnlyPoints + 1
+        : preview.resultOnlyPoints,
+  };
+}
