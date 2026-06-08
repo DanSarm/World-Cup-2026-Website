@@ -33,7 +33,7 @@ export function MatchCard({
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const skipAutoSave = useRef(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const lock = getLockStatus(match);
   const pickable = canPickMatch(match);
@@ -104,9 +104,22 @@ export function MatchCard({
     if (!match.home_team_id || !match.away_team_id) return null;
     if (match.status === "final") return null;
 
-    const predHome = pickable ? homeScore : prediction?.pred_home_score;
-    const predAway = pickable ? awayScore : prediction?.pred_away_score;
-    if (!pickable && (predHome == null || predAway == null)) return null;
+    let predHome: number;
+    let predAway: number;
+
+    if (pickable) {
+      predHome = homeScore;
+      predAway = awayScore;
+    } else {
+      if (
+        prediction?.pred_home_score == null ||
+        prediction?.pred_away_score == null
+      ) {
+        return null;
+      }
+      predHome = prediction.pred_home_score;
+      predAway = prediction.pred_away_score;
+    }
 
     const predWinner = pickable
       ? winnerId

@@ -104,7 +104,6 @@ export function filterSections(
       matches: section.matches.filter((m) => {
         const hasPick = predMap.has(m.id);
         const pickable = canPickMatch(m);
-        const locked = isMatchLocked(m);
 
         if (filter === "need") return pickable && !hasPick;
         if (filter === "saved") return hasPick;
@@ -128,7 +127,6 @@ export function picksProgress(
     (m) => m.home_team_id && m.away_team_id
   );
   const openMatches = pickableMatches.filter((m) => canPickMatch(m));
-  const saved = openMatches.filter((m) => predMap.has(m.id)).length;
   const locked = pickableMatches.filter((m) => isMatchLocked(m)).length;
 
   return {
