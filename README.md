@@ -79,8 +79,10 @@ Optional: set `CRON_SECRET` and schedule `POST /api/cron/sync-odds` (e.g. every 
 
 1. Push to GitHub
 2. Import project in [Vercel](https://vercel.com)
-3. Add all env vars from `.env.local` in Vercel project settings
-4. Deploy
+3. Set **Framework Preset** to **Next.js** (or rely on repo `vercel.json`)
+4. Leave **Output Directory** empty (do not set `.next` manually)
+5. Add all env vars from `.env.local` in Vercel project settings
+6. Deploy with **Discard build cache** if a prior deploy showed middleware or 404 errors
 
 ## Scripts
 
