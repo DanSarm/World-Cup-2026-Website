@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS match_predictions (
   pred_home_score int NOT NULL,
   pred_away_score int NOT NULL,
   pred_winner_team_id uuid REFERENCES teams(id),
+  pick_confirmed boolean NOT NULL DEFAULT false,
   points int DEFAULT 0,
   exact_score boolean DEFAULT false,
   correct_result boolean DEFAULT false,
@@ -107,7 +108,21 @@ CREATE TABLE IF NOT EXISTS match_predictions (
   UNIQUE(player_id, match_id)
 );
 
--- Big Predictions (Before Cup)
+-- Tournament Podium Predictions
+CREATE TABLE IF NOT EXISTS tournament_podium_predictions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id uuid REFERENCES players(id) ON DELETE CASCADE,
+  first_place_team_id uuid REFERENCES teams(id),
+  second_place_team_id uuid REFERENCES teams(id),
+  third_place_team_id uuid REFERENCES teams(id),
+  podium_confirmed boolean NOT NULL DEFAULT false,
+  points int DEFAULT 0,
+  submitted_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(player_id)
+);
+
+-- Big Predictions (legacy — kept for existing data)
 CREATE TABLE IF NOT EXISTS big_predictions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id uuid REFERENCES players(id) ON DELETE CASCADE,

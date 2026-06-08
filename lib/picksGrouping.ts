@@ -1,4 +1,5 @@
 import type { Match, MatchPrediction } from "./types";
+import { hasSavedPick } from "./pickUtils";
 import {
   getTodayTomorrowKeys,
   matchDateKey,
@@ -102,7 +103,7 @@ export function filterSections(
     .map((section) => ({
       ...section,
       matches: section.matches.filter((m) => {
-        const hasPick = predMap.has(m.id);
+        const hasPick = hasSavedPick(predMap.get(m.id));
         const pickable = canPickMatch(m);
 
         if (filter === "need") return pickable && !hasPick;
@@ -130,7 +131,7 @@ export function picksProgress(
   const locked = pickableMatches.filter((m) => isMatchLocked(m)).length;
 
   return {
-    saved: predMap.size,
+    saved: [...predMap.values()].filter((p) => hasSavedPick(p)).length,
     pickable: openMatches.length,
     total: matches.length,
     locked,

@@ -9,8 +9,10 @@ import type {
   MatchStage,
   Player,
   Settings,
+  TournamentPodiumPrediction,
 } from "./types";
 import { isKnockoutStage } from "./types";
+import { isConfirmedPick } from "./pickUtils";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
   capGroupMatchPoints,
@@ -385,6 +387,44 @@ export function calculateBigPredictionPoints(
   return points;
 }
 
+export function calculatePodiumPoints(
+  podium: Pick<
+    TournamentPodiumPrediction,
+    "first_place_team_id" | "second_place_team_id" | "third_place_team_id"
+  >,
+  actualResults: ActualTournamentResults,
+  championProbabilities?: Record<string, number>
+): number {
+  let points = 0;
+
+  if (
+    podium.first_place_team_id &&
+    actualResults.champion === podium.first_place_team_id
+  ) {
+    points += 25;
+    const prob = championProbabilities?.[podium.first_place_team_id];
+    if (prob !== undefined && prob > 0) {
+      points += championProbabilityToLongshotBonus(prob);
+    }
+  }
+
+  if (
+    podium.second_place_team_id &&
+    actualResults.runner_up === podium.second_place_team_id
+  ) {
+    points += 15;
+  }
+
+  if (
+    podium.third_place_team_id &&
+    actualResults.third_place === podium.third_place_team_id
+  ) {
+    points += 10;
+  }
+
+  return points;
+}
+
 export function calculateFinalsChallengePoints(
   finalsPrediction: Pick<
     FinalsChallengePrediction,
@@ -440,7 +480,7 @@ export function calculateLeaderboard(
   players: Player[],
   matches: Match[],
   predictions: MatchPrediction[],
-  bigPredictions: BigPrediction[],
+  podiumPredictions: TournamentPodiumPrediction[],
   finalsPredictions: FinalsChallengePrediction[],
   adjustments: ManualAdjustment[],
   settings: Settings,
@@ -449,13 +489,16 @@ export function calculateLeaderboard(
 ): LeaderboardEntry[] {
   const finalMatch = matches.find((m) => m.stage === "final");
   const scoringConfig = scoringConfigFromSettings(settings);
+  const confirmedPredictions = predictions.filter(isConfirmedPick);
   const perfectDayBonuses = calculatePerfectDayBonuses(
     matches,
-    predictions,
+    confirmedPredictions,
     scoringConfig
   );
 
-  const bigByPlayer = new Map(bigPredictions.map((b) => [b.player_id, b]));
+  const podiumByPlayer = new Map(
+    podiumPredictions.map((p) => [p.player_id, p])
+  );
   const finalsByPlayer = new Map(
     finalsPredictions.map((f) => [f.player_id, f])
   );
@@ -468,7 +511,9 @@ export function calculateLeaderboard(
   }
 
   const entries: LeaderboardEntry[] = players.map((player) => {
-    const playerPreds = predictions.filter((p) => p.player_id === player.id);
+    const playerPreds = confirmedPredictions.filter(
+      (p) => p.player_id === player.id
+    );
     let matchPoints = 0;
     let groupStagePoints = 0;
     let knockoutPoints = 0;
@@ -495,10 +540,10 @@ export function calculateLeaderboard(
       if (result.knockoutCorrect) knockoutCorrect++;
     }
 
-    const bigPred = bigByPlayer.get(player.id);
-    const beforeCupPoints = bigPred
-      ? calculateBigPredictionPoints(
-          bigPred,
+    const podiumPred = podiumByPlayer.get(player.id);
+    const beforeCupPoints = podiumPred
+      ? calculatePodiumPoints(
+          podiumPred,
           actualResults,
           settings.champion_probabilities
         )

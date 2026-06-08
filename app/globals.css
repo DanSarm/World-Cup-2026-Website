@@ -311,6 +311,102 @@ body {
   @apply items-center justify-center px-4 min-w-[5.5rem] min-h-[3.25rem];
 }
 
+.score-stepper--compact {
+  min-height: 2.25rem;
+  border-radius: 0.625rem;
+}
+
+.score-stepper--compact .score-stepper-btn {
+  width: 1.75rem;
+  font-size: 0.875rem;
+}
+
+.score-stepper--compact .score-stepper-input {
+  width: 1.75rem;
+  min-height: 2.25rem;
+  line-height: 2.25rem;
+  font-size: 1.125rem;
+}
+
+.score-stepper--compact.score-stepper-readonly {
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.score-stepper--compact .score-stepper-value {
+  font-size: 1.125rem;
+}
+
+/* Match card flags: large display + high-res CDN (w160 / w320) */
+.match-card-flag {
+  width: 4.25rem !important;
+  height: 3.1875rem !important;
+}
+
+@media (min-width: 768px) {
+  .match-card-flag {
+    width: 5rem !important;
+    height: 3.75rem !important;
+  }
+
+  .score-stepper--compact {
+    min-height: 2.75rem;
+  }
+
+  .score-stepper--compact .score-stepper-btn {
+    width: 2rem;
+    font-size: 1rem;
+  }
+
+  .score-stepper--compact .score-stepper-input {
+    width: 2.25rem;
+    min-height: 2.75rem;
+    line-height: 2.75rem;
+    font-size: 1.25rem;
+  }
+
+  .score-stepper--compact.score-stepper-readonly {
+    min-width: 2.5rem;
+    min-height: 2.75rem;
+  }
+
+  .score-stepper--compact .score-stepper-value {
+    font-size: 1.25rem;
+  }
+}
+
+.score-stepper-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.score-stepper-locked .score-stepper-input {
+  color: var(--color-ink-muted);
+}
+
+.pick-lock-btn {
+  @apply shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors;
+  color: var(--color-usa);
+  background: var(--color-cream);
+  border: 1px solid rgb(0 0 0 / 0.08);
+}
+.pick-lock-btn:hover:not(:disabled) {
+  background: rgb(0 40 104 / 0.08);
+}
+.pick-lock-btn--locked {
+  color: var(--color-ink-muted);
+  background: rgb(0 0 0 / 0.04);
+}
+.pick-lock-btn--disabled:not(.pick-lock-btn--locked) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pick-lock-spinner {
+  @apply w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin;
+}
+
 .score-stepper-value {
   @apply text-2xl font-extrabold;
   color: var(--color-ink);
@@ -358,6 +454,12 @@ body {
   border: 1px solid rgb(0 0 0 / 0.1);
   box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
   background: white;
+  image-rendering: auto;
+}
+
+.match-card-flag.flag-img {
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.14);
 }
 
 .flag-marquee {

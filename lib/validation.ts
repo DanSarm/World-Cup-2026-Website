@@ -10,10 +10,7 @@ export const displayNameSchema = z
   .max(30, "Name too long")
   .regex(/^[a-zA-Z0-9\s\-'.]+$/, "Invalid characters");
 
-export const familyCodeSchema = z.string().min(1, "Family code required");
-
 export const registerSchema = z.object({
-  familyCode: familyCodeSchema,
   displayName: displayNameSchema,
   pin: pinSchema,
   favoriteTeamCode: z
@@ -50,6 +47,20 @@ export const matchPickSchema = z
       return !!d.predWinnerTeamId;
     },
     { message: "Pick who advances for a tied knockout score" }
+  );
+
+export const tournamentPodiumSchema = z
+  .object({
+    firstPlaceTeamId: z.string().uuid(),
+    secondPlaceTeamId: z.string().uuid(),
+    thirdPlaceTeamId: z.string().uuid(),
+  })
+  .refine(
+    (d) =>
+      d.firstPlaceTeamId !== d.secondPlaceTeamId &&
+      d.firstPlaceTeamId !== d.thirdPlaceTeamId &&
+      d.secondPlaceTeamId !== d.thirdPlaceTeamId,
+    { message: "Pick three different teams" }
   );
 
 export const bigPickSchema = z.object({

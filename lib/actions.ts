@@ -14,8 +14,7 @@ import {
   registerSchema,
   loginSchema,
   matchPickSchema,
-  bigPickSchema,
-  finalsChallengeSchema,
+  tournamentPodiumSchema,
   payoutSchema,
   matchResultSchema,
 } from "./validation";
@@ -25,7 +24,6 @@ import type { Match } from "./types";
 
 export async function registerAction(formData: FormData) {
   const parsed = registerSchema.safeParse({
-    familyCode: formData.get("familyCode"),
     displayName: formData.get("displayName"),
     pin: formData.get("pin"),
     favoriteTeamCode: formData.get("favoriteTeamCode") || null,
@@ -94,19 +92,31 @@ export async function saveMatchPickAction(formData: FormData) {
     return { error: parsed.error.errors[0]?.message ?? "Invalid pick" };
   }
 
-  const { error } = await supabase.from("match_predictions").upsert(
-    {
-      player_id: session.id,
-      match_id: matchId,
-      pred_home_score: parsed.data.predHomeScore,
-      pred_away_score: parsed.data.predAwayScore,
-      pred_winner_team_id: parsed.data.predWinnerTeamId ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "player_id,match_id" }
-  );
+  const row = {
+    player_id: session.id,
+    match_id: matchId,
+    pred_home_score: parsed.data.predHomeScore,
+    pred_away_score: parsed.data.predAwayScore,
+    pred_winner_team_id: parsed.data.predWinnerTeamId ?? null,
+    pick_confirmed: true,
+    updated_at: new Date().toISOString(),
+  };
 
-  if (error) return { error: "Could not save pick" };
+  let { error } = await supabase
+    .from("match_predictions")
+    .upsert(row, { onConflict: "player_id,match_id" });
+
+  if (error?.message.includes("pick_confirmed")) {
+    const { pick_confirmed: _confirmed, ...legacyRow } = row;
+    ({ error } = await supabase
+      .from("match_predictions")
+      .upsert(legacyRow, { onConflict: "player_id,match_id" }));
+  }
+
+  if (error) {
+    console.error("saveMatchPickAction:", error.message);
+    return { error: "Could not save pick" };
+  }
 
   await logAudit(session.id, "save_match_pick", { matchId });
   revalidatePath("/picks");
@@ -114,118 +124,94 @@ export async function saveMatchPickAction(formData: FormData) {
   return { success: true };
 }
 
-export async function saveBigPicksAction(formData: FormData) {
+export async function saveTournamentPodiumAction(formData: FormData) {
   const session = await requireSession();
   const settings = await getSettings();
   if (settings.big_predictions_locked) {
-    return { error: "Big Picks are locked" };
+    return { error: "Tournament podium picks are locked" };
   }
 
-  const groupWinners: Record<string, string> = {};
-  const groupRunnersUp: Record<string, string> = {};
+  const supabase = getSupabase();
+  const { data: startedMatch } = await supabase
+    .from("matches")
+    .select("id")
+    .or("status.eq.final,status.eq.locked")
+    .limit(1)
+    .maybeSingle();
 
-  for (const letter of "ABCDEFGHIJKL") {
-    const w = formData.get(`groupWinner_${letter}`);
-    const r = formData.get(`groupRunnerUp_${letter}`);
-    if (w) groupWinners[letter] = w as string;
-    if (r) groupRunnersUp[letter] = r as string;
+  if (!startedMatch) {
+    const { data: pastKickoff } = await supabase
+      .from("matches")
+      .select("id, kickoff_at")
+      .not("kickoff_at", "is", null)
+      .limit(50);
+    const now = Date.now();
+    if (
+      pastKickoff?.some(
+        (m) => m.kickoff_at && new Date(m.kickoff_at).getTime() <= now
+      )
+    ) {
+      return { error: "Tournament podium picks are locked" };
+    }
+  } else {
+    return { error: "Tournament podium picks are locked" };
   }
 
-  const semifinalists = [
-    formData.get("semifinalist_0"),
-    formData.get("semifinalist_1"),
-    formData.get("semifinalist_2"),
-    formData.get("semifinalist_3"),
-  ].filter(Boolean) as string[];
-
-  const finalists = [
-    formData.get("finalist_0"),
-    formData.get("finalist_1"),
-  ].filter(Boolean) as string[];
-
-  const parsed = bigPickSchema.safeParse({
-    groupWinners,
-    groupRunnersUp,
-    semifinalists,
-    finalists,
-    championTeamId: formData.get("championTeamId"),
-    topScorer: formData.get("topScorer") || null,
+  const parsed = tournamentPodiumSchema.safeParse({
+    firstPlaceTeamId: formData.get("firstPlaceTeamId"),
+    secondPlaceTeamId: formData.get("secondPlaceTeamId"),
+    thirdPlaceTeamId: formData.get("thirdPlaceTeamId"),
   });
 
   if (!parsed.success) {
     return { error: parsed.error.errors[0]?.message ?? "Invalid picks" };
   }
 
-  const supabase = getSupabase();
-  const { error } = await supabase.from("big_predictions").upsert(
+  const { data: existing } = await supabase
+    .from("tournament_podium_predictions")
+    .select("podium_confirmed")
+    .eq("player_id", session.id)
+    .maybeSingle();
+
+  if (existing?.podium_confirmed) {
+    return { error: "Podium picks are already locked in" };
+  }
+
+  const { error } = await supabase.from("tournament_podium_predictions").upsert(
     {
       player_id: session.id,
-      group_winners: parsed.data.groupWinners,
-      group_runners_up: parsed.data.groupRunnersUp,
-      semifinalists: parsed.data.semifinalists,
-      finalists: parsed.data.finalists,
-      champion_team_id: parsed.data.championTeamId,
-      top_scorer: parsed.data.topScorer ?? null,
+      first_place_team_id: parsed.data.firstPlaceTeamId,
+      second_place_team_id: parsed.data.secondPlaceTeamId,
+      third_place_team_id: parsed.data.thirdPlaceTeamId,
+      podium_confirmed: true,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "player_id" }
   );
 
-  if (error) return { error: "Could not save" };
-
-  await logAudit(session.id, "save_big_picks", {});
-  revalidatePath("/big-picks");
-  return { success: true };
-}
-
-export async function saveFinalsChallengeAction(formData: FormData) {
-  const session = await requireSession();
-  const settings = await getSettings();
-  if (!settings.finals_challenge_open) {
-    return { error: "Finals Challenge not open yet" };
+  if (error) {
+    if (error.message.includes("podium_confirmed")) {
+      const { error: legacyError } = await supabase
+        .from("tournament_podium_predictions")
+        .upsert(
+          {
+            player_id: session.id,
+            first_place_team_id: parsed.data.firstPlaceTeamId,
+            second_place_team_id: parsed.data.secondPlaceTeamId,
+            third_place_team_id: parsed.data.thirdPlaceTeamId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "player_id" }
+        );
+      if (legacyError) return { error: "Could not save podium picks" };
+    } else {
+      return { error: "Could not save podium picks" };
+    }
   }
 
-  const quarterfinalists = Array.from({ length: 8 }, (_, i) =>
-    formData.get(`qf_${i}`)
-  ).filter(Boolean) as string[];
-
-  const semifinalists = Array.from({ length: 4 }, (_, i) =>
-    formData.get(`sf_${i}`)
-  ).filter(Boolean) as string[];
-
-  const finalists = [
-    formData.get("finalist_0"),
-    formData.get("finalist_1"),
-  ].filter(Boolean) as string[];
-
-  const parsed = finalsChallengeSchema.safeParse({
-    quarterfinalists,
-    semifinalists,
-    finalists,
-    championTeamId: formData.get("championTeamId"),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.errors[0]?.message ?? "Invalid picks" };
-  }
-
-  const supabase = getSupabase();
-  const { error } = await supabase.from("finals_challenge_predictions").upsert(
-    {
-      player_id: session.id,
-      quarterfinalists: parsed.data.quarterfinalists,
-      semifinalists: parsed.data.semifinalists,
-      finalists: parsed.data.finalists,
-      champion_team_id: parsed.data.championTeamId,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "player_id" }
-  );
-
-  if (error) return { error: "Could not save" };
-
-  await logAudit(session.id, "save_finals_challenge", {});
-  revalidatePath("/big-picks");
+  await logAudit(session.id, "save_tournament_podium", {});
+  revalidatePath("/picks");
+  revalidatePath("/");
   revalidatePath("/leaderboard");
   return { success: true };
 }
@@ -603,6 +589,7 @@ export async function adminOverridePickAction(formData: FormData) {
       pred_home_score: Number(formData.get("predHomeScore")),
       pred_away_score: Number(formData.get("predAwayScore")),
       pred_winner_team_id: (formData.get("predWinnerTeamId") as string) || null,
+      pick_confirmed: true,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "player_id,match_id" }

@@ -12,7 +12,7 @@ interface NavProps {
 const links = [
   { href: "/", label: "Home" },
   { href: "/picks", label: "Picks" },
-  { href: "/big-picks", label: "Big Picks" },
+  { href: "/bracket", label: "Bracket" },
   { href: "/leaderboard", label: "Leaderboard" },
 ];
 

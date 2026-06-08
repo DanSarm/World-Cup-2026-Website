@@ -1,8 +1,8 @@
 "use client";
 
 interface ScoreControlProps {
-  value: number;
-  onChange: (v: number) => void;
+  value: number | null;
+  onChange: (v: number | null) => void;
   disabled?: boolean;
   compact?: boolean;
 }
@@ -15,32 +15,46 @@ export function ScoreControl({
 }: ScoreControlProps) {
   if (compact) {
     return (
-      <div className="score-stepper">
+      <div
+        className={`score-stepper score-stepper--compact ${
+          disabled ? "score-stepper-locked" : ""
+        }`}
+      >
         <button
           type="button"
-          disabled={disabled || value <= 0}
-          onClick={() => onChange(Math.max(0, value - 1))}
+          disabled={disabled || value === null || value <= 0}
+          onClick={() => onChange(value === null ? null : Math.max(0, value - 1))}
           className="score-stepper-btn"
           aria-label="Decrease score"
         >
           −
         </button>
         <input
-          type="number"
-          min={0}
-          max={20}
-          value={value}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={value === null ? "" : value}
           disabled={disabled}
-          onChange={(e) =>
-            onChange(Math.min(20, Math.max(0, Number(e.target.value) || 0)))
-          }
-          className="score-stepper-input disabled:opacity-50"
+          readOnly={disabled}
+          placeholder="–"
+          onChange={(e) => {
+            const raw = e.target.value.trim();
+            if (raw === "") {
+              onChange(null);
+              return;
+            }
+            const n = Number(raw);
+            if (Number.isFinite(n)) {
+              onChange(Math.min(20, Math.max(0, n)));
+            }
+          }}
+          className="score-stepper-input disabled:opacity-50 placeholder:text-ink-faint placeholder:font-bold"
           aria-label="Score"
         />
         <button
           type="button"
-          disabled={disabled || value >= 20}
-          onClick={() => onChange(value + 1)}
+          disabled={disabled || value !== null && value >= 20}
+          onClick={() => onChange(value === null ? 0 : value + 1)}
           className="score-stepper-btn"
           aria-label="Increase score"
         >
@@ -54,29 +68,37 @@ export function ScoreControl({
     <div className="flex flex-col items-center gap-1.5">
       <button
         type="button"
-        disabled={disabled || value >= 20}
-        onClick={() => onChange(value + 1)}
+        disabled={disabled || (value !== null && value >= 20)}
+        onClick={() => onChange(value === null ? 0 : value + 1)}
         className="score-btn"
         aria-label="Increase score"
       >
         +
       </button>
       <input
-        type="number"
-        min={0}
-        max={20}
-        value={value}
+        type="text"
+        inputMode="numeric"
+        value={value === null ? "" : value}
         disabled={disabled}
-        onChange={(e) =>
-          onChange(Math.min(20, Math.max(0, Number(e.target.value) || 0)))
-        }
+        placeholder="–"
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === "") {
+            onChange(null);
+            return;
+          }
+          const n = Number(raw);
+          if (Number.isFinite(n)) {
+            onChange(Math.min(20, Math.max(0, n)));
+          }
+        }}
         className="score-input disabled:opacity-50"
         aria-label="Score"
       />
       <button
         type="button"
-        disabled={disabled || value <= 0}
-        onClick={() => onChange(Math.max(0, value - 1))}
+        disabled={disabled || value === null || value <= 0}
+        onClick={() => onChange(value === null ? null : Math.max(0, value - 1))}
         className="score-btn"
         aria-label="Decrease score"
       >
@@ -87,10 +109,10 @@ export function ScoreControl({
 }
 
 interface ScorePickerProps {
-  homeScore: number;
-  awayScore: number;
-  onHomeChange: (v: number) => void;
-  onAwayChange: (v: number) => void;
+  homeScore: number | null;
+  awayScore: number | null;
+  onHomeChange: (v: number | null) => void;
+  onAwayChange: (v: number | null) => void;
   disabled?: boolean;
 }
 
@@ -117,10 +139,22 @@ export function ScorePicker({
   );
 }
 
-export function ScoreDisplay({ value }: { value: number }) {
+export function ScoreDisplay({
+  value,
+  compact = false,
+}: {
+  value: number | null;
+  compact?: boolean;
+}) {
   return (
-    <div className="score-stepper score-stepper-readonly">
-      <span className="score-stepper-value tabular-nums">{value}</span>
+    <div
+      className={`score-stepper score-stepper-readonly ${
+        compact ? "score-stepper--compact" : ""
+      }`}
+    >
+      <span className="score-stepper-value tabular-nums">
+        {value === null ? "–" : value}
+      </span>
     </div>
   );
 }

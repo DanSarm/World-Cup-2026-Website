@@ -1,22 +1,27 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useTransition, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { ScoreControl, ScoreDisplay } from "./ScorePicker";
 import { saveMatchPickAction } from "@/lib/actions";
 import { formatKickoff, getLockStatus, canPickMatch } from "@/lib/utils";
 import { getStageLabel, isKnockoutStage } from "@/lib/types";
 import type { Match, MatchPrediction, Team } from "@/lib/types";
 import { previewPickRewards, DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/scoringConfig";
+import { hasSavedPick } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
 import { MatchOddsBar } from "./MatchOddsBar";
+import { PickCountdownBadge } from "./PickCountdown";
+import { PickLockButton } from "./PickLockButton";
 
 interface MatchCardProps {
   match: Match;
   prediction?: MatchPrediction | null;
   scoringConfig?: ScoringConfig;
   onPickChange?: (matchId: string, home: number, away: number) => void;
+  showPickCountdown?: boolean;
 }
 
 export function MatchCard({
@@ -24,56 +29,69 @@ export function MatchCard({
   prediction,
   scoringConfig = DEFAULT_SCORING_CONFIG,
   onPickChange,
+  showPickCountdown = false,
 }: MatchCardProps) {
-  const [homeScore, setHomeScore] = useState(prediction?.pred_home_score ?? 0);
-  const [awayScore, setAwayScore] = useState(prediction?.pred_away_score ?? 0);
+  const router = useRouter();
+  const saved = hasSavedPick(prediction);
+  const [homeScore, setHomeScore] = useState<number | null>(
+    saved ? (prediction?.pred_home_score ?? null) : null
+  );
+  const [awayScore, setAwayScore] = useState<number | null>(
+    saved ? (prediction?.pred_away_score ?? null) : null
+  );
   const [winnerId, setWinnerId] = useState<string | null>(
     prediction?.pred_winner_team_id ?? null
   );
+  const [isLocked, setIsLocked] = useState(saved);
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-  const skipAutoSave = useRef(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [isSaving, startTransition] = useTransition();
 
   const lock = getLockStatus(match);
   const pickable = canPickMatch(match);
   const isKO = isKnockoutStage(match.stage);
-  const needsWinner = isKO && homeScore === awayScore;
+  const needsWinner =
+    isKO && homeScore !== null && awayScore !== null && homeScore === awayScore;
+  const canLock =
+    homeScore !== null &&
+    awayScore !== null &&
+    (!needsWinner || winnerId !== null);
 
-  const persistPick = useCallback(
-    (home: number, away: number, winner: string | null) => {
-      if (!pickable) return;
-      if (isKO && home === away && !winner) return;
-
-      const fd = new FormData();
-      fd.set("matchId", match.id);
-      fd.set("predHomeScore", String(home));
-      fd.set("predAwayScore", String(away));
-      if (winner) fd.set("predWinnerTeamId", winner);
-
-      startTransition(async () => {
-        const result = await saveMatchPickAction(fd);
-        if (result.error) setError(result.error);
-        else setError(null);
-      });
-    },
-    [match.id, pickable, isKO]
-  );
-
-  useEffect(() => {
-    if (skipAutoSave.current) {
-      skipAutoSave.current = false;
+  const savePick = useCallback(() => {
+    if (homeScore === null || awayScore === null) {
+      setError("Set both scores before locking");
       return;
     }
-    if (!pickable) return;
+    if (needsWinner && !winnerId) {
+      setError("Pick who advances before locking");
+      return;
+    }
 
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      persistPick(homeScore, awayScore, winnerId);
-    }, 400);
+    const fd = new FormData();
+    fd.set("matchId", match.id);
+    fd.set("predHomeScore", String(homeScore));
+    fd.set("predAwayScore", String(awayScore));
+    if (winnerId) fd.set("predWinnerTeamId", winnerId);
 
-    return () => clearTimeout(saveTimer.current);
-  }, [homeScore, awayScore, winnerId, pickable, persistPick]);
+    startTransition(async () => {
+      const result = await saveMatchPickAction(fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setIsLocked(true);
+      router.refresh();
+    });
+  }, [homeScore, awayScore, winnerId, needsWinner, match.id, router]);
+
+  function handleLockToggle() {
+    if (isLocked) {
+      setIsLocked(false);
+      setError(null);
+      return;
+    }
+    savePick();
+  }
 
   function notifyPickChange(home: number, away: number) {
     if (pickable && match.stage === "group" && onPickChange) {
@@ -81,20 +99,34 @@ export function MatchCard({
     }
   }
 
-  function handleHomeChange(score: number) {
+  function handleHomeChange(score: number | null) {
     setHomeScore(score);
-    notifyPickChange(score, awayScore);
+    if (score !== null && awayScore !== null) {
+      notifyPickChange(score, awayScore);
+    }
   }
 
-  function handleAwayChange(score: number) {
+  function handleAwayChange(score: number | null) {
     setAwayScore(score);
-    notifyPickChange(homeScore, score);
+    if (homeScore !== null && score !== null) {
+      notifyPickChange(homeScore, score);
+    }
   }
 
-  const displayHome = pickable ? homeScore : (prediction?.pred_home_score ?? 0);
-  const displayAway = pickable ? awayScore : (prediction?.pred_away_score ?? 0);
+  const displayHome = pickable
+    ? homeScore
+    : saved
+      ? (prediction?.pred_home_score ?? null)
+      : null;
+  const displayAway = pickable
+    ? awayScore
+    : saved
+      ? (prediction?.pred_away_score ?? null)
+      : null;
   const showScores =
-    match.home_team_id && match.away_team_id && (pickable || prediction);
+    match.home_team_id &&
+    match.away_team_id &&
+    (pickable || saved);
 
   function handleWinnerPick(teamId: string) {
     setWinnerId(teamId);
@@ -108,9 +140,11 @@ export function MatchCard({
     let predAway: number;
 
     if (pickable) {
+      if (homeScore === null || awayScore === null) return null;
       predHome = homeScore;
       predAway = awayScore;
     } else {
+      if (!saved) return null;
       if (
         prediction?.pred_home_score == null ||
         prediction?.pred_away_score == null
@@ -137,6 +171,7 @@ export function MatchCard({
   }, [
     match,
     pickable,
+    saved,
     homeScore,
     awayScore,
     winnerId,
@@ -157,24 +192,39 @@ export function MatchCard({
             <p className="text-xs text-ink-faint truncate">{match.venue}</p>
           )}
         </div>
-        {exactPointsPreview != null && (
-          <div
-            className="shrink-0 text-right leading-tight"
-            title="Points if your exact score is correct"
-          >
-            <span className="text-base font-extrabold text-mexico tabular-nums">
-              +{exactPointsPreview}
-            </span>
-            <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-              pts
-            </span>
-          </div>
-        )}
+        <div className="flex items-start gap-2 shrink-0">
+          {showPickCountdown ? (
+            <PickCountdownBadge kickoffAt={match.kickoff_at} />
+          ) : (
+            exactPointsPreview != null && (
+              <div
+                className="shrink-0 text-right leading-tight"
+                title="Points if your exact score is correct"
+              >
+                <span className="text-base font-extrabold text-mexico tabular-nums">
+                  +{exactPointsPreview}
+                </span>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                  pts
+                </span>
+              </div>
+            )
+          )}
+          {pickable && (
+            <PickLockButton
+              isLocked={isLocked}
+              isSaving={isSaving}
+              onClick={handleLockToggle}
+              canLock={canLock}
+            />
+          )}
+        </div>
       </div>
 
       <MatchupRow
         match={match}
         pickable={pickable}
+        scoresLocked={pickable && isLocked}
         showScores={!!showScores}
         homeScore={homeScore}
         awayScore={awayScore}
@@ -221,8 +271,9 @@ export function MatchCard({
                     <button
                       key={team.id}
                       type="button"
+                      disabled={isLocked}
                       onClick={() => handleWinnerPick(team.id)}
-                      className={`flex-1 py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      className={`flex-1 py-3 px-3 rounded-xl border-2 text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-45 disabled:cursor-not-allowed ${
                         winnerId === team.id
                           ? "border-usa bg-usa/5 text-usa"
                           : "border-ink/10 hover:border-usa/40 text-ink-muted"
@@ -242,7 +293,7 @@ export function MatchCard({
       ) : lock.variant !== "final" ? (
         <div className="space-y-3">
           {error && <div className="alert-error">{error}</div>}
-          {!prediction && (
+          {!saved && (
             <p className="text-center text-sm text-canada font-semibold">
               🔒 Locked — no pick saved
             </p>
@@ -256,6 +307,7 @@ export function MatchCard({
 function MatchupRow({
   match,
   pickable,
+  scoresLocked,
   showScores,
   homeScore,
   awayScore,
@@ -266,41 +318,52 @@ function MatchupRow({
 }: {
   match: Match;
   pickable: boolean;
+  scoresLocked: boolean;
   showScores: boolean;
-  homeScore: number;
-  awayScore: number;
-  displayHome: number;
-  displayAway: number;
-  onHomeChange: (v: number) => void;
-  onAwayChange: (v: number) => void;
+  homeScore: number | null;
+  awayScore: number | null;
+  displayHome: number | null;
+  displayAway: number | null;
+  onHomeChange: (v: number | null) => void;
+  onAwayChange: (v: number | null) => void;
 }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 md:gap-3">
       <TeamSide
         team={match.home_team}
         label={match.home_label}
         align="left"
       />
 
-      <div className="flex items-center justify-center gap-2 shrink-0">
+      <div className="flex items-center justify-center gap-1 md:gap-1.5 shrink-0">
         {showScores && (
           <>
             {pickable ? (
-              <ScoreControl value={homeScore} onChange={onHomeChange} compact />
+              <ScoreControl
+                value={homeScore}
+                onChange={onHomeChange}
+                compact
+                disabled={scoresLocked}
+              />
             ) : (
-              <ScoreDisplay value={displayHome} />
+              <ScoreDisplay value={displayHome} compact />
             )}
           </>
         )}
-        <div className="shrink-0 w-9 h-9 rounded-full bg-cream flex items-center justify-center">
-          <span className="text-[10px] font-black text-ink-faint">VS</span>
+        <div className="shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-cream flex items-center justify-center">
+          <span className="text-[9px] md:text-[10px] font-black text-ink-faint">VS</span>
         </div>
         {showScores && (
           <>
             {pickable ? (
-              <ScoreControl value={awayScore} onChange={onAwayChange} compact />
+              <ScoreControl
+                value={awayScore}
+                onChange={onAwayChange}
+                compact
+                disabled={scoresLocked}
+              />
             ) : (
-              <ScoreDisplay value={displayAway} />
+              <ScoreDisplay value={displayAway} compact />
             )}
           </>
         )}
@@ -326,13 +389,18 @@ function TeamSide({
 }) {
   return (
     <div
-      className={`flex flex-col gap-1 min-w-0 ${
+      className={`flex flex-col gap-1 min-w-0 max-w-[7.5rem] md:max-w-[9rem] ${
         align === "right"
           ? "items-end justify-self-end text-right"
           : "items-start justify-self-start text-left"
       }`}
     >
-      <TeamFlag team={team} size="lg" className="shrink-0" />
+      <TeamFlag
+        team={team}
+        size="xl"
+        highRes
+        className="shrink-0 match-card-flag"
+      />
       <TeamMeta team={team} label={label} align={align} />
     </div>
   );
@@ -355,8 +423,11 @@ function TeamMeta({
     >
       {team ? (
         <>
-          <TeamCode code={team.fifa_code} prominent className="text-ink block" />
-          <span className="text-xs font-medium text-ink-muted leading-snug truncate block mt-0.5">
+          <TeamCode
+            code={team.fifa_code}
+            className="!text-base md:!text-lg tracking-wide text-ink block leading-none"
+          />
+          <span className="text-[11px] md:text-xs font-medium text-ink-muted leading-tight truncate block mt-0.5 max-w-full">
             {team.short_name}
           </span>
         </>

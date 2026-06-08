@@ -121,9 +121,22 @@ export interface MatchPrediction {
   pred_home_score: number;
   pred_away_score: number;
   pred_winner_team_id: string | null;
+  pick_confirmed?: boolean;
   points: number;
   exact_score: boolean;
   correct_result: boolean;
+  submitted_at?: string;
+  updated_at?: string;
+}
+
+export interface TournamentPodiumPrediction {
+  id: string;
+  player_id: string;
+  first_place_team_id: string | null;
+  second_place_team_id: string | null;
+  third_place_team_id: string | null;
+  podium_confirmed?: boolean;
+  points: number;
   submitted_at?: string;
   updated_at?: string;
 }
@@ -198,6 +211,8 @@ export interface ActualTournamentResults {
   semifinalists?: string[];
   finalists?: string[];
   champion?: string;
+  runner_up?: string;
+  third_place?: string;
   top_scorer?: string;
   quarterfinalists?: string[];
   team_rounds_reached?: Record<string, string>;

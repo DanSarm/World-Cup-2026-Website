@@ -1,57 +1,51 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { MatchCard } from "./MatchCard";
 import { PageHeader } from "./PageHeader";
-import { GroupStandingsPanel } from "./GroupStandingsPanel";
 import {
   groupMatchesForPicks,
   filterSections,
   picksProgress,
   type PicksFilter,
 } from "@/lib/picksGrouping";
-import type { PickScore } from "@/lib/groupStandings";
-import type { Match, MatchPrediction } from "@/lib/types";
+import type { Match, MatchPrediction, Team, TournamentPodiumPrediction } from "@/lib/types";
 import type { ScoringConfig } from "@/lib/scoringConfig";
 import { canPickMatch } from "@/lib/utils";
+import { hasSavedPick } from "@/lib/pickUtils";
+import { TournamentPodiumCard } from "./TournamentPodiumCard";
 
 interface PicksClientProps {
   matches: Match[];
   predictions: MatchPrediction[];
   scoringConfig: ScoringConfig;
+  teams: Team[];
+  myPodium?: TournamentPodiumPrediction | null;
+  podiumLocked: boolean;
+  worldCupKickoff: string | null;
 }
 
 const FILTERS: { key: PicksFilter; label: string }[] = [
-  { key: "all", label: "All" },
   { key: "need", label: "Need Pick" },
   { key: "saved", label: "Saved" },
   { key: "open", label: "Open" },
+  { key: "all", label: "All" },
 ];
 
-export function PicksClient({ matches, predictions, scoringConfig }: PicksClientProps) {
-  const [filter, setFilter] = useState<PicksFilter>("all");
-  const [draftPicks, setDraftPicks] = useState<Map<string, PickScore>>(
-    () => new Map()
-  );
-  const [highlightGroup, setHighlightGroup] = useState<string | null>(null);
+export function PicksClient({
+  matches,
+  predictions,
+  scoringConfig,
+  teams,
+  myPodium,
+  podiumLocked,
+  worldCupKickoff,
+}: PicksClientProps) {
+  const [filter, setFilter] = useState<PicksFilter>("need");
 
   const predMap = useMemo(
     () => new Map(predictions.map((p) => [p.match_id, p])),
     [predictions]
-  );
-
-  const handlePickChange = useCallback(
-    (matchId: string, home: number, away: number) => {
-      const match = matches.find((m) => m.id === matchId);
-      if (match?.group_letter) setHighlightGroup(match.group_letter);
-
-      setDraftPicks((prev) => {
-        const next = new Map(prev);
-        next.set(matchId, { home, away });
-        return next;
-      });
-    },
-    [matches]
   );
 
   const sections = useMemo(() => groupMatchesForPicks(matches), [matches]);
@@ -65,14 +59,12 @@ export function PicksClient({ matches, predictions, scoringConfig }: PicksClient
   );
 
   const openSaved = matches.filter(
-    (m) => canPickMatch(m) && predMap.has(m.id)
+    (m) => canPickMatch(m) && hasSavedPick(predMap.get(m.id))
   ).length;
   const pct =
     progress.pickable > 0
       ? Math.round((openSaved / progress.pickable) * 100)
       : 0;
-
-  const hasGroupStage = matches.some((m) => m.stage === "group");
 
   return (
     <div className="space-y-6">
@@ -82,14 +74,12 @@ export function PicksClient({ matches, predictions, scoringConfig }: PicksClient
         subtitle="Pick scores before kickoff · Every game counts"
       />
 
-      {hasGroupStage && (
-        <GroupStandingsPanel
-          matches={matches}
-          predictions={predictions}
-          draftPicks={draftPicks}
-          highlightGroup={highlightGroup}
-        />
-      )}
+      <TournamentPodiumCard
+        teams={teams}
+        myPodium={myPodium}
+        locked={podiumLocked}
+        worldCupKickoff={worldCupKickoff}
+      />
 
       <div className="card space-y-3">
         <div className="flex items-center justify-between">
@@ -142,7 +132,6 @@ export function PicksClient({ matches, predictions, scoringConfig }: PicksClient
                   match={m}
                   prediction={predMap.get(m.id)}
                   scoringConfig={scoringConfig}
-                  onPickChange={m.stage === "group" ? handlePickChange : undefined}
                 />
               ))}
             </div>

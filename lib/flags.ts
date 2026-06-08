@@ -89,6 +89,15 @@ export function flagImageUrl2xForSize(fifaCode: string, size: FlagSize = "md"): 
   return flagImageUrl(fifaCode, FLAG_CDN_WIDTH_2X[size]);
 }
 
+/** Sharp flags for large on-screen display (match cards, etc.). */
+export function flagImageUrlHighRes(fifaCode: string): string {
+  return flagImageUrl(fifaCode, 160);
+}
+
+export function flagImageUrlHighRes2x(fifaCode: string): string {
+  return flagImageUrl(fifaCode, 320);
+}
+
 export function allFifaCodes(): string[] {
   return Object.keys(FIFA_TO_ISO);
 }

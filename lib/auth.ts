@@ -115,7 +115,6 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function registerPlayer(input: {
-  familyCode: string;
   displayName: string;
   pin: string;
   favoriteTeamCode?: string | null;
@@ -123,17 +122,6 @@ export async function registerPlayer(input: {
 }): Promise<{ success: boolean; error?: string }> {
   const configError = getDatabaseConfigError();
   if (configError) return { success: false, error: configError };
-
-  const familyCode = process.env.FAMILY_ACCESS_CODE;
-  if (!familyCode || familyCode === "your_family_code") {
-    return {
-      success: false,
-      error: "Family code not set up yet. Ask the admin for FAMILY_ACCESS_CODE.",
-    };
-  }
-  if (input.familyCode !== familyCode) {
-    return { success: false, error: "Wrong family code" };
-  }
 
   const supabase = getSupabase();
 

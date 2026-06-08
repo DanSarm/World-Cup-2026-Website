@@ -1,32 +1,40 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import { getLeaderboardData, getMatchesWithTeams } from "@/lib/data";
-import { calculatePot } from "@/lib/payouts";
-import { PrizeCard } from "@/components/PrizeCard";
+import { getSettings } from "@/lib/auth";
+import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium } from "@/lib/data";
+import { findNextUpcomingMatch } from "@/lib/nextPick";
+import { scoringConfigFromSettings } from "@/lib/scoringConfig";
+import { getWorldCupKickoff, isMatchLocked } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
-import { formatKickoff } from "@/lib/utils";
-import type { Match } from "@/lib/types";
-import { TeamFlag } from "@/components/Flag";
+import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
+import { MatchCard } from "@/components/MatchCard";
+import { MatchCommunityPicks } from "@/components/MatchCommunityPicks";
+import { TournamentPodiumCard } from "@/components/TournamentPodiumCard";
 
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [{ leaderboard, settings, players }, matches] = await Promise.all([
+  const [{ leaderboard }, matches, predictions, settings, teams, myPodium] = await Promise.all([
     getLeaderboardData(),
     getMatchesWithTeams(),
+    getPredictions(session.id),
+    getSettings(),
+    getTeams(),
+    getMyTournamentPodium(session.id),
   ]);
 
-  const me = leaderboard.find((e) => e.playerId === session.id);
-  const paidCount = players.filter((p) => p.paid).length;
-  const pot = calculatePot(settings.buy_in, paidCount);
+  const scoringConfig = scoringConfigFromSettings(settings);
+  const predMap = new Map(predictions.map((p) => [p.match_id, p]));
+  const upcomingMatch = findNextUpcomingMatch(matches);
+  const worldCupKickoff = getWorldCupKickoff(matches);
+  const firstMatchStarted = matches.some((m) => isMatchLocked(m));
+  const podiumLocked = settings.big_predictions_locked || firstMatchStarted;
+  const communityPicks = upcomingMatch
+    ? await getConfirmedMatchPicks(upcomingMatch.id)
+    : [];
   const top5 = leaderboard.slice(0, 5);
-
-  const upcoming = matches
-    .filter((m) => m.status !== "final")
-    .sort((a, b) => (a.kickoff_at ?? "9999").localeCompare(b.kickoff_at ?? "9999"))
-    .slice(0, 3);
 
   const missingKickoffs = matches.some((m) => !m.kickoff_at);
 
@@ -44,42 +52,30 @@ export default async function HomePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <PrizeCard icon="💰" label="Prize Pot" value={pot} highlight />
-        <PrizeCard icon="⭐" label="My Points" value={String(me?.totalPoints ?? 0)} />
-        <PrizeCard
-          icon="🏆"
-          label={settings.tournament_complete ? "My Won" : "Projected Prize"}
-          value={me?.projectedPrize ?? 0}
-        />
-        <PrizeCard icon="🎯" label="Exact Scores" value={String(me?.exactScores ?? 0)} />
-      </div>
+      <TournamentPodiumCard
+        teams={teams}
+        myPodium={myPodium}
+        locked={podiumLocked}
+        worldCupKickoff={worldCupKickoff}
+      />
 
-      <div className="flex justify-center">
-        <span
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold ${
-            session.paid
-              ? "bg-mexico/15 text-mexico border border-mexico/30"
-              : "bg-gold/15 text-gold-light border border-gold/30"
-          }`}
-        >
-          {session.paid ? "✅ Paid" : "💳 Need to Pay"}
-        </span>
-      </div>
-
-      <Link href="/picks" className="btn-gold">
-        ⚽ Make Picks
-      </Link>
-
-      {upcoming.length > 0 && (
+      {upcomingMatch ? (
         <section className="space-y-3">
-          <h2 className="section-title px-0.5">Next Up</h2>
-          <div className="space-y-2">
-            {upcoming.map((m) => (
-              <MiniMatch key={m.id} match={m} />
-            ))}
-          </div>
+          <h2 className="section-title px-0.5">Upcoming Game</h2>
+          <MatchCard
+            match={upcomingMatch}
+            prediction={predMap.get(upcomingMatch.id)}
+            scoringConfig={scoringConfig}
+            showPickCountdown
+          />
+          <MatchCommunityPicks
+            match={upcomingMatch}
+            picks={communityPicks}
+            currentPlayerId={session.id}
+          />
         </section>
+      ) : (
+        <AllPicksDoneHero />
       )}
 
       <section className="space-y-3">
@@ -112,23 +108,6 @@ export default async function HomePage() {
           )}
         </div>
       </section>
-    </div>
-  );
-}
-
-function MiniMatch({ match }: { match: Match }) {
-  return (
-    <div className="card py-3.5 px-4 flex items-center gap-3">
-      <div className="flex gap-1.5 shrink-0">
-        <TeamFlag team={match.home_team} size="md" />
-        <TeamFlag team={match.away_team} size="md" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-ink truncate">
-          {match.home_label} vs {match.away_label}
-        </p>
-        <p className="text-xs text-ink-faint">{formatKickoff(match.kickoff_at)}</p>
-      </div>
     </div>
   );
 }

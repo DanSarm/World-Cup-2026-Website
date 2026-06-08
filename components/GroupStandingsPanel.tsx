@@ -8,20 +8,21 @@ import {
   type PickScore,
 } from "@/lib/groupStandings";
 import { GROUP_LETTERS, type Match, type MatchPrediction } from "@/lib/types";
+import { hasSavedPick } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 
 interface GroupStandingsPanelProps {
   matches: Match[];
   predictions: MatchPrediction[];
-  draftPicks: Map<string, PickScore>;
+  draftPicks?: Map<string, PickScore>;
   highlightGroup?: string | null;
 }
 
 export function GroupStandingsPanel({
   matches,
   predictions,
-  draftPicks,
+  draftPicks = new Map(),
   highlightGroup,
 }: GroupStandingsPanelProps) {
   const [expanded, setExpanded] = useState(true);
@@ -30,6 +31,7 @@ export function GroupStandingsPanel({
   const savedMap = useMemo(() => {
     const map = new Map<string, PickScore>();
     for (const p of predictions) {
+      if (!hasSavedPick(p)) continue;
       map.set(p.match_id, {
         home: p.pred_home_score,
         away: p.pred_away_score,
@@ -69,7 +71,7 @@ export function GroupStandingsPanel({
             Your group picture
           </h2>
           <p className="text-xs text-ink-muted leading-snug">
-            Standings update live as you change picks
+            Based on your saved group-stage picks
           </p>
         </div>
         <button

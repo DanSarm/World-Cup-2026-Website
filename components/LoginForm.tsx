@@ -70,13 +70,6 @@ export function LoginForm({ teams, isRegister: initialRegister }: LoginPageProps
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegister && (
-            <div>
-              <label className="label">Family Code</label>
-              <input name="familyCode" type="password" required className="input-field" placeholder="••••••••" />
-            </div>
-          )}
-
           <div>
             <label className="label">Your Name</label>
             <input name="displayName" type="text" required className="input-field" placeholder="Display name" autoComplete="username" />

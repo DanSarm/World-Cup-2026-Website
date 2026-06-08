@@ -55,6 +55,15 @@ export function canPickMatch(match: Match): boolean {
   return !!(match.home_team_id && match.away_team_id && !isMatchLocked(match));
 }
 
+/** Earliest scheduled kickoff — countdown target for tournament-wide picks. */
+export function getWorldCupKickoff(matches: Match[]): string | null {
+  const kickoffs = matches
+    .filter((m) => m.home_team_id && m.away_team_id && m.kickoff_at)
+    .map((m) => m.kickoff_at!)
+    .sort();
+  return kickoffs[0] ?? null;
+}
+
 export function siteName(): string {
   return process.env.NEXT_PUBLIC_SITE_NAME ?? "Family Cup 2026";
 }

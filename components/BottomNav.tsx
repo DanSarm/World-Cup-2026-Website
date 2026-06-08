@@ -10,7 +10,7 @@ interface BottomNavProps {
 const links = [
   { href: "/", label: "Home", icon: "🏠" },
   { href: "/picks", label: "Picks", icon: "⚽" },
-  { href: "/big-picks", label: "Big", icon: "🏆" },
+  { href: "/bracket", label: "Bracket", icon: "📋" },
   { href: "/leaderboard", label: "Rank", icon: "📊" },
 ];
 
