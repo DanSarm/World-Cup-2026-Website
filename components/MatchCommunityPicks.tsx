@@ -67,10 +67,29 @@ export function MatchCommunityPicks({
   scoringConfig?: ScoringConfig;
   showLivePoints?: boolean;
 }) {
+  // Identical predictions always sit next to each other: group rows by
+  // predicted score (and KO winner pick), rank groups by their best points.
+  const scoreKey = (pick: CommunityMatchPick) =>
+    `${pick.predHomeScore}-${pick.predAwayScore}-${pick.predWinnerTeamId ?? ""}`;
+
+  const groupPts = new Map<string, number>();
+  for (const pick of picks) {
+    const key = scoreKey(pick);
+    const pts = maxPointsIfCorrect(match, pick, scoringConfig) ?? -1;
+    groupPts.set(key, Math.max(groupPts.get(key) ?? -1, pts));
+  }
+
+  const totalGoals = (pick: CommunityMatchPick) =>
+    pick.predHomeScore + pick.predAwayScore;
+
   const sortedPicks = [...picks].sort((a, b) => {
-    const aPts = maxPointsIfCorrect(match, a, scoringConfig) ?? -1;
-    const bPts = maxPointsIfCorrect(match, b, scoringConfig) ?? -1;
+    const aKey = scoreKey(a);
+    const bKey = scoreKey(b);
+    const aPts = groupPts.get(aKey) ?? -1;
+    const bPts = groupPts.get(bKey) ?? -1;
     if (bPts !== aPts) return bPts - aPts;
+    if (totalGoals(b) !== totalGoals(a)) return totalGoals(b) - totalGoals(a);
+    if (aKey !== bKey) return aKey.localeCompare(bKey);
     return a.displayName.localeCompare(b.displayName);
   });
 
