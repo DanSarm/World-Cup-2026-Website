@@ -57,13 +57,13 @@ const THIRD_PLACE_MATCH_SLOT: Record<number, WinnerSlot> = {
   87: "K",
 };
 
-type SlotRef =
+export type SlotRef =
   | { kind: "group"; letter: string; rank: 1 | 2 | 3 }
   | { kind: "third"; slot: WinnerSlot }
   | { kind: "winner"; matchNumber: number }
   | { kind: "loser"; matchNumber: number };
 
-const MATCH_SLOTS: Record<number, { home: SlotRef; away: SlotRef }> = {
+export const MATCH_SLOTS: Record<number, { home: SlotRef; away: SlotRef }> = {
   73: { home: { kind: "group", letter: "A", rank: 2 }, away: { kind: "group", letter: "B", rank: 2 } },
   74: { home: { kind: "group", letter: "E", rank: 1 }, away: { kind: "third", slot: "E" } },
   75: { home: { kind: "group", letter: "F", rank: 1 }, away: { kind: "group", letter: "C", rank: 2 } },

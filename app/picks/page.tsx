@@ -33,7 +33,7 @@ export default async function PicksPage() {
   const podiumLocked = settings.big_predictions_locked || firstMatchStarted;
   const worldCupKickoff = getWorldCupKickoff(matches);
 
-  const pickMatches = resolveMatchesForPicks(matches, predictions);
+  const pickMatches = resolveMatchesForPicks(matches);
 
   return (
     <PicksClient
@@ -44,7 +44,6 @@ export default async function PicksPage() {
       myPodium={myPodium}
       podiumLocked={podiumLocked}
       worldCupKickoff={worldCupKickoff}
-      championProbabilities={settings.champion_probabilities}
     />
   );
 }

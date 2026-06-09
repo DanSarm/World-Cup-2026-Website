@@ -56,6 +56,13 @@ export interface Team {
   fifa_code: string;
   flag_emoji: string;
   group_letter: string | null;
+  /** Pre-tournament market win % (e.g. 14 = 14%) */
+  market_win_percentage?: number | null;
+  market_rank?: number | null;
+  /** Display label, e.g. "<1%" — calculations still use the stored % */
+  market_label?: string | null;
+  /** Admin override for the computed tournament value */
+  tournament_value_override?: number | null;
   created_at?: string;
 }
 
@@ -138,6 +145,9 @@ export interface TournamentPodiumPrediction {
   third_place_team_id: string | null;
   podium_confirmed?: boolean;
   points: number;
+  champion_points?: number;
+  runner_up_points?: number;
+  third_place_points?: number;
   submitted_at?: string;
   updated_at?: string;
 }
@@ -251,6 +261,11 @@ export interface LeaderboardEntry {
   knockoutCorrect: number;
   picksMade: number;
   beforeCupPoints: number;
+  /** Total Tournament Picks points (champion + runner-up + third place) */
+  tournamentPickPoints: number;
+  championPickPoints: number;
+  runnerUpPickPoints: number;
+  thirdPlacePickPoints: number;
   finalsChallengePoints: number;
   rank: number;
   projectedPrize: number;

@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS teams (
   fifa_code text UNIQUE NOT NULL,
   flag_emoji text NOT NULL,
   group_letter text,
+  market_win_percentage numeric,
+  market_rank int,
+  market_label text,
+  tournament_value_override int,
   created_at timestamptz DEFAULT now()
 );
 
@@ -118,6 +122,9 @@ CREATE TABLE IF NOT EXISTS tournament_podium_predictions (
   third_place_team_id uuid REFERENCES teams(id),
   podium_confirmed boolean NOT NULL DEFAULT false,
   points int DEFAULT 0,
+  champion_points int NOT NULL DEFAULT 0,
+  runner_up_points int NOT NULL DEFAULT 0,
+  third_place_points int NOT NULL DEFAULT 0,
   submitted_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   UNIQUE(player_id)

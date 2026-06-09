@@ -2,8 +2,16 @@ import {
   scoreMatchPrediction,
   calculatePerfectDayBonuses,
   calculateBigPredictionPoints,
+  calculatePodiumPoints,
 } from "./scoring";
-import type { Match, MatchPrediction } from "./types";
+import {
+  calculateTeamTournamentValue,
+  tournamentPlacePoints,
+  pickRiskLabel,
+  formatMarketWinPercent,
+  estimateWinPercentageFromRank,
+} from "./tournamentValue";
+import type { Match, MatchPrediction, Team } from "./types";
 
 let passed = 0;
 let failed = 0;
@@ -235,6 +243,125 @@ assert(
     { jpn: 0.04 }
   ) === 35,
   "champion + longshot bonus = 35"
+);
+
+// ── Tournament Picks: market-based dynamic points ──
+
+const marketTeam = (
+  id: string,
+  pct: number | null,
+  override: number | null = null
+): Team => ({
+  id,
+  name: id,
+  short_name: id,
+  fifa_code: id.toUpperCase(),
+  flag_emoji: "🏳️",
+  group_letter: null,
+  market_win_percentage: pct,
+  tournament_value_override: override,
+});
+
+assert(
+  calculateTeamTournamentValue(marketTeam("fra", 14)) === 7,
+  "France 14% → value 7"
+);
+assert(
+  calculateTeamTournamentValue(marketTeam("mar", 1.6)) === 63,
+  "Morocco 1.6% → value 63"
+);
+assert(
+  calculateTeamTournamentValue(marketTeam("hai", 0.4)) === 250,
+  "Haiti 0.4% → value 250 (capped)"
+);
+assert(
+  calculateTeamTournamentValue(marketTeam("esp", 25)) === 5,
+  "Heavy favorite clamps to value 5"
+);
+assert(
+  calculateTeamTournamentValue(marketTeam("xxx", null)) === 0,
+  "Missing market % → value 0"
+);
+assert(
+  calculateTeamTournamentValue(marketTeam("ovr", 14, 100)) === 100,
+  "Override beats computed value"
+);
+
+assert(
+  tournamentPlacePoints(marketTeam("fra", 14), "champion") === 7 &&
+    tournamentPlacePoints(marketTeam("fra", 14), "runnerUp") === 3 &&
+    tournamentPlacePoints(marketTeam("fra", 14), "thirdPlace") === 2,
+  "France champion 7 / runner-up 3 / third 2"
+);
+assert(
+  tournamentPlacePoints(marketTeam("mar", 1.6), "champion") === 63 &&
+    tournamentPlacePoints(marketTeam("mar", 1.6), "runnerUp") === 28 &&
+    tournamentPlacePoints(marketTeam("mar", 1.6), "thirdPlace") === 19,
+  "Morocco champion 63 / runner-up 28 / third 19"
+);
+assert(
+  tournamentPlacePoints(marketTeam("hai", 0.4), "runnerUp") === 113 &&
+    tournamentPlacePoints(marketTeam("hai", 0.4), "thirdPlace") === 75,
+  "Haiti runner-up 113 / third 75"
+);
+
+assert(
+  pickRiskLabel(7).label === "Safe pick" &&
+    pickRiskLabel(28).label === "Brave pick" &&
+    pickRiskLabel(63).label === "Longshot" &&
+    pickRiskLabel(250).label === "Miracle",
+  "risk labels by points band"
+);
+
+assert(
+  formatMarketWinPercent({ market_win_percentage: 0.4, market_label: "<1%" }) === "<1%" &&
+    formatMarketWinPercent({ market_win_percentage: 14, market_label: null }) === "14%" &&
+    formatMarketWinPercent({ market_win_percentage: 8.9, market_label: null }) === "8.9%",
+  "market % display formatting"
+);
+
+assert(
+  estimateWinPercentageFromRank(20) === 0.8 &&
+    estimateWinPercentageFromRank(28) === 0.5 &&
+    estimateWinPercentageFromRank(40) === 0.4,
+  "rank-band win % estimates"
+);
+
+const podiumTeams = new Map<string, Team>([
+  ["fra", marketTeam("fra", 14)],
+  ["mar", marketTeam("mar", 1.6)],
+  ["hai", marketTeam("hai", 0.4)],
+]);
+
+const podiumBreakdown = calculatePodiumPoints(
+  {
+    first_place_team_id: "mar",
+    second_place_team_id: "fra",
+    third_place_team_id: "hai",
+  },
+  { champion: "mar", runner_up: "fra", third_place: "hai" },
+  podiumTeams
+);
+assert(
+  podiumBreakdown.champion === 63 &&
+    podiumBreakdown.runnerUp === 3 &&
+    podiumBreakdown.thirdPlace === 75 &&
+    podiumBreakdown.total === 141,
+  "podium breakdown: all exact positions correct"
+);
+
+const podiumWrongOrder = calculatePodiumPoints(
+  {
+    first_place_team_id: "fra",
+    second_place_team_id: "mar",
+    third_place_team_id: "hai",
+  },
+  { champion: "mar", runner_up: "fra", third_place: "qat" },
+  podiumTeams
+);
+assert(
+  podiumWrongOrder.total === 0,
+  "no points unless exact position is correct"
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

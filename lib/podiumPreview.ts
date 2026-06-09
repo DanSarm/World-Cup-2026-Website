@@ -1,11 +1,15 @@
-import { championProbabilityToLongshotBonus } from "./odds/math";
+import type { Team } from "./types";
+import {
+  tournamentPlacePoints,
+  type TournamentPickPlace,
+} from "./tournamentValue";
 
 export type PodiumPlace = "first" | "second" | "third";
 
-const PODIUM_BASE_POINTS: Record<PodiumPlace, number> = {
-  first: 25,
-  second: 15,
-  third: 10,
+const PLACE_TO_PICK_PLACE: Record<PodiumPlace, TournamentPickPlace> = {
+  first: "champion",
+  second: "runnerUp",
+  third: "thirdPlace",
 };
 
 export const PODIUM_FORM_PLACE: Record<string, PodiumPlace> = {
@@ -14,18 +18,10 @@ export const PODIUM_FORM_PLACE: Record<string, PodiumPlace> = {
   thirdPlaceTeamId: "third",
 };
 
-/** Max points if this podium slot is guessed correctly. */
+/** Points if this Tournament Pick slot is exactly correct. */
 export function previewPodiumPlacePoints(
   place: PodiumPlace,
-  teamId: string,
-  championProbabilities?: Record<string, number>
+  team: Pick<Team, "market_win_percentage" | "tournament_value_override"> | null | undefined
 ): number {
-  let points = PODIUM_BASE_POINTS[place];
-  if (place === "first") {
-    const prob = championProbabilities?.[teamId];
-    if (prob !== undefined && prob > 0) {
-      points += championProbabilityToLongshotBonus(prob);
-    }
-  }
-  return points;
+  return tournamentPlacePoints(team, PLACE_TO_PICK_PLACE[place]);
 }

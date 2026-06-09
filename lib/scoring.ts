@@ -9,6 +9,7 @@ import type {
   MatchStage,
   Player,
   Settings,
+  Team,
   TournamentPodiumPrediction,
 } from "./types";
 import { isKnockoutStage } from "./types";
@@ -22,6 +23,7 @@ import {
   DEFAULT_SCORING_CONFIG,
 } from "./scoringConfig";
 import { championProbabilityToLongshotBonus } from "./odds/math";
+import { tournamentPlacePoints } from "./tournamentValue";
 
 function getKnockoutAdvancePoints(stage: MatchStage): number {
   const map: Partial<Record<MatchStage, number>> = {
@@ -394,42 +396,65 @@ export function calculateBigPredictionPoints(
   return points;
 }
 
+export interface TournamentPickPointsBreakdown {
+  total: number;
+  champion: number;
+  runnerUp: number;
+  thirdPlace: number;
+}
+
+/**
+ * Tournament Picks scoring: dynamic points from each team's
+ * pre-tournament market win %. Only the exact position counts.
+ */
 export function calculatePodiumPoints(
   podium: Pick<
     TournamentPodiumPrediction,
     "first_place_team_id" | "second_place_team_id" | "third_place_team_id"
   >,
   actualResults: ActualTournamentResults,
-  championProbabilities?: Record<string, number>
-): number {
-  let points = 0;
+  teamsById: Map<string, Team>
+): TournamentPickPointsBreakdown {
+  let champion = 0;
+  let runnerUp = 0;
+  let thirdPlace = 0;
 
   if (
     podium.first_place_team_id &&
     actualResults.champion === podium.first_place_team_id
   ) {
-    points += 25;
-    const prob = championProbabilities?.[podium.first_place_team_id];
-    if (prob !== undefined && prob > 0) {
-      points += championProbabilityToLongshotBonus(prob);
-    }
+    champion = tournamentPlacePoints(
+      teamsById.get(podium.first_place_team_id),
+      "champion"
+    );
   }
 
   if (
     podium.second_place_team_id &&
     actualResults.runner_up === podium.second_place_team_id
   ) {
-    points += 15;
+    runnerUp = tournamentPlacePoints(
+      teamsById.get(podium.second_place_team_id),
+      "runnerUp"
+    );
   }
 
   if (
     podium.third_place_team_id &&
     actualResults.third_place === podium.third_place_team_id
   ) {
-    points += 10;
+    thirdPlace = tournamentPlacePoints(
+      teamsById.get(podium.third_place_team_id),
+      "thirdPlace"
+    );
   }
 
-  return points;
+  return {
+    total: champion + runnerUp + thirdPlace,
+    champion,
+    runnerUp,
+    thirdPlace,
+  };
 }
 
 export function calculateFinalsChallengePoints(
@@ -493,9 +518,11 @@ export function calculateLeaderboard(
   settings: Settings,
   actualResults: ActualTournamentResults,
   projectedPrizes: Map<string, number>,
+  teams: Team[] = [],
   options?: { includeLiveScores?: boolean }
 ): LeaderboardEntry[] {
   const includeLiveScores = options?.includeLiveScores ?? false;
+  const teamsById = new Map(teams.map((t) => [t.id, t]));
   const finalMatch = matches.find((m) => m.stage === "final");
   const scoringConfig = scoringConfigFromSettings(settings);
   const confirmedPredictions = predictions.filter(isConfirmedPick);
@@ -563,13 +590,10 @@ export function calculateLeaderboard(
     }
 
     const podiumPred = podiumByPlayer.get(player.id);
-    const beforeCupPoints = podiumPred
-      ? calculatePodiumPoints(
-          podiumPred,
-          actualResults,
-          settings.champion_probabilities
-        )
-      : 0;
+    const tournamentPicks = podiumPred
+      ? calculatePodiumPoints(podiumPred, actualResults, teamsById)
+      : { total: 0, champion: 0, runnerUp: 0, thirdPlace: 0 };
+    const beforeCupPoints = tournamentPicks.total;
 
     const finalsPred = finalsByPlayer.get(player.id);
     const finalsChallengePoints = finalsPred
@@ -619,6 +643,10 @@ export function calculateLeaderboard(
         getEffectiveMatchPrediction(m, predByMatchId.get(m.id))
       ).length,
       beforeCupPoints,
+      tournamentPickPoints: tournamentPicks.total,
+      championPickPoints: tournamentPicks.champion,
+      runnerUpPickPoints: tournamentPicks.runnerUp,
+      thirdPlacePickPoints: tournamentPicks.thirdPlace,
       finalsChallengePoints,
       rank: 0,
       projectedPrize: projectedPrizes.get(player.id) ?? 0,

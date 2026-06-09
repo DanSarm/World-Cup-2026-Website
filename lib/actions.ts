@@ -724,3 +724,131 @@ export async function adminAddTeamAction(formData: FormData) {
   revalidatePath("/admin");
   return { success: true };
 }
+
+function parseOptionalNumber(value: FormDataEntryValue | null): number | null {
+  if (value == null) return null;
+  const str = String(value).trim();
+  if (!str) return null;
+  const num = Number(str);
+  return Number.isFinite(num) ? num : null;
+}
+
+export async function adminUpdateTeamMarketAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const supabase = getSupabase();
+
+  const teamId = formData.get("teamId") as string;
+  if (!teamId) return { error: "Missing team" };
+
+  const marketRank = parseOptionalNumber(formData.get("marketRank"));
+  let marketPct = parseOptionalNumber(formData.get("marketWinPercentage"));
+  const marketLabel = String(formData.get("marketLabel") ?? "").trim() || null;
+  const valueOverride = parseOptionalNumber(
+    formData.get("tournamentValueOverride")
+  );
+
+  // "<1%" teams without an explicit % get the rank-based estimate
+  if (marketPct == null && marketLabel === "<1%" && marketRank != null) {
+    const { estimateWinPercentageFromRank } = await import("./tournamentValue");
+    marketPct = estimateWinPercentageFromRank(marketRank);
+  }
+
+  const { error } = await supabase
+    .from("teams")
+    .update({
+      market_rank: marketRank,
+      market_win_percentage: marketPct,
+      market_label: marketLabel,
+      tournament_value_override: valueOverride,
+    })
+    .eq("id", teamId);
+
+  if (error) return { error: error.message };
+
+  await recalculateAllScores();
+  await logAudit(admin.id, "update_team_market", { teamId });
+  revalidatePath("/admin");
+  revalidatePath("/picks");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
+  return { success: true };
+}
+
+export async function adminImportMarketCsvAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const supabase = getSupabase();
+
+  const csvText = String(formData.get("csv") ?? "").trim();
+  if (!csvText) return { error: "Paste CSV rows first" };
+
+  const { estimateWinPercentageFromRank } = await import("./tournamentValue");
+
+  const { data: teamRows } = await supabase
+    .from("teams")
+    .select("id, fifa_code");
+  const teamByCode = new Map(
+    (teamRows ?? []).map((t) => [t.fifa_code.toUpperCase(), t.id])
+  );
+
+  const lines = csvText.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return { error: "Empty CSV" };
+
+  // Header optional — detect it by the team_code column name
+  const first = lines[0].toLowerCase();
+  const startIdx = first.includes("team_code") ? 1 : 0;
+
+  let imported = 0;
+  const errors: string[] = [];
+
+  for (let i = startIdx; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim());
+    const [code, rankRaw, pctRaw, labelRaw] = cols;
+    if (!code) continue;
+
+    const teamId = teamByCode.get(code.toUpperCase());
+    if (!teamId) {
+      errors.push(`Unknown team code: ${code}`);
+      continue;
+    }
+
+    const rank = rankRaw ? Number(rankRaw) : null;
+    let pct = pctRaw ? Number(pctRaw) : null;
+    if (pct != null && !Number.isFinite(pct)) pct = null;
+    const label = labelRaw || null;
+
+    if (pct == null && label === "<1%" && rank != null && Number.isFinite(rank)) {
+      pct = estimateWinPercentageFromRank(rank);
+    }
+
+    const { error } = await supabase
+      .from("teams")
+      .update({
+        market_rank: rank != null && Number.isFinite(rank) ? rank : null,
+        market_win_percentage: pct,
+        market_label: label,
+      })
+      .eq("id", teamId);
+
+    if (error) {
+      errors.push(`${code}: ${error.message}`);
+    } else {
+      imported++;
+    }
+  }
+
+  await recalculateAllScores();
+  await logAudit(admin.id, "import_market_csv", { imported });
+  revalidatePath("/admin");
+  revalidatePath("/picks");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
+
+  if (errors.length) {
+    return {
+      success: true,
+      imported,
+      error: `Imported ${imported} rows · Issues: ${errors.slice(0, 5).join("; ")}`,
+    };
+  }
+  return { success: true, imported };
+}

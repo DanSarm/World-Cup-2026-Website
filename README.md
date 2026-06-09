@@ -115,7 +115,7 @@ Live scores **do not** run on a Vercel cron. Pages poll only while a match may b
 
 - **Home** — Prize pot, your stats, next matches, top 5
 - **Picks** — Score predictions for every match
-- **Big Picks** — Before Cup + Finals Challenge
+- **Tournament Picks** — Champion, Runner-up & Third Place with market-based dynamic points (favorites small, longshots huge)
 - **Leaderboard** — Points, exact scores, projected prizes
 - **Admin** — Players, matches, scores, settings (admin only)
 

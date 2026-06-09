@@ -23,7 +23,6 @@ interface PicksClientProps {
   myPodium?: TournamentPodiumPrediction | null;
   podiumLocked: boolean;
   worldCupKickoff: string | null;
-  championProbabilities?: Record<string, number>;
 }
 
 const FILTERS: { key: PicksFilter; label: string }[] = [
@@ -41,7 +40,6 @@ export function PicksClient({
   myPodium,
   podiumLocked,
   worldCupKickoff,
-  championProbabilities,
 }: PicksClientProps) {
   const [filter, setFilter] = useState<PicksFilter>("need");
 
@@ -81,7 +79,6 @@ export function PicksClient({
         myPodium={myPodium}
         locked={podiumLocked}
         worldCupKickoff={worldCupKickoff}
-        championProbabilities={championProbabilities}
       />
 
       <div className="card space-y-3">

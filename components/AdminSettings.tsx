@@ -253,7 +253,7 @@ export function AdminSettings({
 
             <input name="big_predictions_locked" type="checkbox" defaultChecked={settings.big_predictions_locked} />
 
-            Lock Tournament Podium
+            Lock Tournament Picks
 
           </label>
 

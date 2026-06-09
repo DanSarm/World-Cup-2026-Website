@@ -782,7 +782,7 @@ body {
 
 .home-podium-place-medal {
   @apply text-center shrink-0 leading-none;
-  width: 2.25rem;
+  width: 2.5rem;
 }
 
 .home-podium-place-medal--first {
@@ -990,7 +990,6 @@ body {
 
   .home-podium-place-medal--first {
     font-size: 1.75rem;
-    width: 2rem;
   }
 
   .home-podium-place-medal--second {

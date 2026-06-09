@@ -18,8 +18,9 @@ export async function ensureMatchesSeeded(): Promise<void> {
   );
 
   for (const f of ALL_FIXTURES) {
-    // Placeholder kickoff (2pm ET) for date grouping — admin can update exact times later
-    const kickoffAt = f.date ? `${f.date}T18:00:00.000Z` : null;
+    // Official kickoff times (stored UTC, ET schedule)
+    const kickoffAt =
+      f.kickoff_utc ?? (f.date ? `${f.date}T18:00:00.000Z` : null);
 
     await supabase.from("matches").upsert(
       {

@@ -8,6 +8,11 @@ import {
   previewPodiumPlacePoints,
   PODIUM_FORM_PLACE,
 } from "@/lib/podiumPreview";
+import {
+  calculateTeamTournamentValue,
+  formatMarketWinPercent,
+  pickRiskLabel,
+} from "@/lib/tournamentValue";
 import type { FlagSize } from "@/lib/flags";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
@@ -21,7 +26,6 @@ interface TournamentPodiumCardProps {
   /** Admin lock or World Cup already started */
   locked: boolean;
   worldCupKickoff: string | null;
-  championProbabilities?: Record<string, number>;
   /** Rendered beside the podium card (e.g. champion odds on home) */
   companion?: ReactNode;
 }
@@ -29,7 +33,7 @@ interface TournamentPodiumCardProps {
 const PLACES = [
   {
     key: "firstPlaceTeamId",
-    label: "1st Place",
+    label: "Champion",
     medal: "🥇",
     field: "first_place_team_id" as const,
     tier: "first" as const,
@@ -37,7 +41,7 @@ const PLACES = [
   },
   {
     key: "secondPlaceTeamId",
-    label: "2nd Place",
+    label: "Runner-up",
     medal: "🥈",
     field: "second_place_team_id" as const,
     tier: "second" as const,
@@ -45,7 +49,7 @@ const PLACES = [
   },
   {
     key: "thirdPlaceTeamId",
-    label: "3rd Place",
+    label: "Third Place",
     medal: "🥉",
     field: "third_place_team_id" as const,
     tier: "third" as const,
@@ -58,7 +62,6 @@ export function TournamentPodiumCard({
   myPodium,
   locked,
   worldCupKickoff,
-  championProbabilities,
   companion,
 }: TournamentPodiumCardProps) {
   const router = useRouter();
@@ -76,9 +79,13 @@ export function TournamentPodiumCard({
     thirdPlaceTeamId: myPodium?.third_place_team_id ?? "",
   }));
 
-  const sortedTeams = [...teams].sort((a, b) =>
-    a.fifa_code.localeCompare(b.fifa_code)
-  );
+  // Favorites first (lowest tournament value), unknowns last
+  const sortedTeams = [...teams].sort((a, b) => {
+    const aVal = calculateTeamTournamentValue(a) || Infinity;
+    const bVal = calculateTeamTournamentValue(b) || Infinity;
+    if (aVal !== bVal) return aVal - bVal;
+    return a.fifa_code.localeCompare(b.fifa_code);
+  });
 
   const confirmed = myPodium?.podium_confirmed === true;
   const readOnly = locked || confirmed;
@@ -102,11 +109,7 @@ export function TournamentPodiumCard({
         medal: place.medal,
         label: place.label,
         team,
-        maxPoints: previewPodiumPlacePoints(
-          PODIUM_FORM_PLACE[place.key],
-          teamId,
-          championProbabilities
-        ),
+        maxPoints: previewPodiumPlacePoints(PODIUM_FORM_PLACE[place.key], team),
       });
     }
 
@@ -133,10 +136,10 @@ export function TournamentPodiumCard({
   const header = (
     <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
       <div className="space-y-0.5 min-w-0">
-        <h2 className="section-title">Tournament Podium</h2>
+        <h2 className="section-title">Tournament Picks</h2>
         {!readOnly && (
           <p className="text-xs text-ink-muted">
-            Pick 1st, 2nd & 3rd before the World Cup starts
+            Pick the final podium before the first match.
           </p>
         )}
       </div>
@@ -158,7 +161,6 @@ export function TournamentPodiumCard({
     <PodiumPicksDisplay
       teams={teams}
       myPodium={myPodium}
-      championProbabilities={championProbabilities}
       fillHeight={!!companion}
       locked={locked}
     />
@@ -167,20 +169,18 @@ export function TournamentPodiumCard({
   const editBody = (
     <>
       <p className="text-sm text-ink-muted">
-        Predict who finishes 1st, 2nd, and 3rd. Once saved, your picks cannot
-        be changed.
+        Pick the Champion, Runner-up, and Third Place. Favorites are worth
+        fewer points — longshots pay big. Once saved, your picks cannot be
+        changed.
       </p>
 
       {PLACES.map(({ key, label, medal }) => {
         const selectedId = selections[key];
         const selected = teams.find((t) => t.id === selectedId);
-        const maxPts = selectedId
-          ? previewPodiumPlacePoints(
-              PODIUM_FORM_PLACE[key],
-              selectedId,
-              championProbabilities
-            )
+        const maxPts = selected
+          ? previewPodiumPlacePoints(PODIUM_FORM_PLACE[key], selected)
           : null;
+        const risk = maxPts != null ? pickRiskLabel(maxPts) : null;
         return (
           <div key={key}>
             <div className="flex items-center justify-between gap-2 mb-1">
@@ -204,12 +204,33 @@ export function TournamentPodiumCard({
               className="input-field text-sm py-2.5"
             >
               <option value="">— Select team —</option>
-              {sortedTeams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.fifa_code} — {t.name}
-                </option>
-              ))}
+              {sortedTeams.map((t) => {
+                const pts = previewPodiumPlacePoints(PODIUM_FORM_PLACE[key], t);
+                const optionRisk = pickRiskLabel(pts);
+                return (
+                  <option key={t.id} value={t.id}>
+                    {t.flag_emoji} {t.fifa_code} · {formatMarketWinPercent(t)}
+                    {pts > 0
+                      ? ` · ${pts} pts${optionRisk.emoji ? ` ${optionRisk.emoji}` : ""}`
+                      : ""}
+                  </option>
+                );
+              })}
             </select>
+            {selected && maxPts != null && risk && (
+              <p className="mt-1.5 text-xs text-ink-muted">
+                <span className="font-semibold text-ink">{selected.name}</span>
+                {" · "}
+                <span className="font-bold text-mexico tabular-nums">
+                  {maxPts} pts
+                </span>
+                {" · "}
+                <span className="font-medium">
+                  {risk.label}
+                  {risk.emoji ? ` ${risk.emoji}` : ""}
+                </span>
+              </p>
+            )}
           </div>
         );
       })}
@@ -247,9 +268,11 @@ export function TournamentPodiumCard({
           }
         >
           {readOnly ? (
-            <div className={cardClassName}>{bodyContent}</div>
+            <div key="picks-body" className={cardClassName}>
+              {bodyContent}
+            </div>
           ) : (
-            <form ref={formRef} className={cardClassName}>
+            <form key="picks-body" ref={formRef} className={cardClassName}>
               {bodyContent}
             </form>
           )}
@@ -276,13 +299,11 @@ export function TournamentPodiumCard({
 function PodiumPicksDisplay({
   teams,
   myPodium,
-  championProbabilities,
   fillHeight,
   locked,
 }: {
   teams: Team[];
   myPodium?: TournamentPodiumPrediction | null;
-  championProbabilities?: Record<string, number>;
   fillHeight: boolean;
   locked: boolean;
 }) {
@@ -295,14 +316,9 @@ function PodiumPicksDisplay({
       {PLACES.map(({ label, medal, field, key, tier, flagSize }) => {
         const teamId = myPodium?.[field];
         const team = teamId ? teams.find((t) => t.id === teamId) : null;
-        const maxPts =
-          team && teamId
-            ? previewPodiumPlacePoints(
-                PODIUM_FORM_PLACE[key],
-                teamId,
-                championProbabilities
-              )
-            : null;
+        const maxPts = team
+          ? previewPodiumPlacePoints(PODIUM_FORM_PLACE[key], team)
+          : null;
 
         return (
           <div

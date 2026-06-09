@@ -84,6 +84,27 @@ export function MatchCommunityPicks({
         sortedPicks.map((pick) => {
           const isYou = pick.playerId === currentPlayerId;
           const maxPts = maxPointsIfCorrect(match, pick, scoringConfig);
+          const isLive =
+            match.status === "live" &&
+            match.home_score != null &&
+            match.away_score != null;
+          // Goals only go up, so once the live score passes a prediction
+          // on either side that exact score can never happen.
+          const exactImpossible =
+            isLive &&
+            (match.home_score! > pick.predHomeScore ||
+              match.away_score! > pick.predAwayScore);
+          const exactRightNow =
+            isLive &&
+            match.home_score === pick.predHomeScore &&
+            match.away_score === pick.predAwayScore;
+          const rowStateClass = exactRightNow
+            ? "bg-mexico/10"
+            : exactImpossible
+              ? "opacity-45 grayscale"
+              : isYou
+                ? "bg-usa/5"
+                : "";
           const livePts =
             showLivePoints && match.status === "live"
               ? scoreMatchPrediction(
@@ -100,7 +121,7 @@ export function MatchCommunityPicks({
           return (
             <div
               key={pick.playerId}
-              className={`lb-row lb-row--community ${isYou ? "bg-usa/5" : ""}`}
+              className={`lb-row lb-row--community transition-all duration-500 ${rowStateClass}`}
             >
               <PlayerPodiumFlags
                 picks={pick.podiumPicks}

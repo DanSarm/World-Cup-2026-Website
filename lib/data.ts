@@ -341,7 +341,8 @@ export async function getLeaderboardData(options?: {
     adjustments,
     settings,
     actualResults,
-    new Map()
+    new Map(),
+    teams
   );
 
   const projectedPrizes = buildProjectedPrizes(
@@ -363,6 +364,7 @@ export async function getLeaderboardData(options?: {
       settings,
       actualResults,
       projectedPrizes,
+      teams,
       { includeLiveScores }
     )
   );
@@ -395,7 +397,7 @@ export async function getLiveSnapshot() {
 
 export async function recalculateAllScores(): Promise<void> {
   const supabase = getSupabase();
-  const [matches, predictions, podiumPredictions, finalsPredictions, actualResults, settings, players] =
+  const [matches, predictions, podiumPredictions, finalsPredictions, actualResults, settings, players, teams] =
     await Promise.all([
       getMatchesWithTeams(),
       getPredictions(),
@@ -404,6 +406,7 @@ export async function recalculateAllScores(): Promise<void> {
       getActualResults(),
       getSettings(),
       getPlayers(),
+      getTeams(),
     ]);
 
   const { ensureDefaultPredictionsForLockedMatches } = await import(
@@ -439,16 +442,26 @@ export async function recalculateAllScores(): Promise<void> {
   const { calculatePodiumPoints, calculateFinalsChallengePoints } =
     await import("./scoring");
 
+  const teamsById = new Map(teams.map((t) => [t.id, t]));
   for (const pp of podiumPredictions) {
-    const points = calculatePodiumPoints(
-      pp,
-      actualResults,
-      settings.champion_probabilities
-    );
-    await supabase
+    const breakdown = calculatePodiumPoints(pp, actualResults, teamsById);
+    const { error } = await supabase
       .from("tournament_podium_predictions")
-      .update({ points, updated_at: new Date().toISOString() })
+      .update({
+        points: breakdown.total,
+        champion_points: breakdown.champion,
+        runner_up_points: breakdown.runnerUp,
+        third_place_points: breakdown.thirdPlace,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", pp.id);
+    if (error) {
+      // Older DBs without the breakdown columns: persist the total only
+      await supabase
+        .from("tournament_podium_predictions")
+        .update({ points: breakdown.total, updated_at: new Date().toISOString() })
+        .eq("id", pp.id);
+    }
   }
 
   for (const fp of finalsPredictions) {

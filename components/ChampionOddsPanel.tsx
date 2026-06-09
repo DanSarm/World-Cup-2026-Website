@@ -1,5 +1,6 @@
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
+import { tournamentPlacePoints } from "@/lib/tournamentValue";
 import type { ChampionOddsRow } from "@/lib/odds/championOdds";
 
 interface ChampionOddsPanelProps {
@@ -35,34 +36,45 @@ export function ChampionOddsPanel({ entries }: ChampionOddsPanelProps) {
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto podium-odds-scroll">
           <ol className="divide-y divide-ink/5">
-            {entries.map((entry, index) => (
-              <li
-                key={entry.team.id}
-                className="flex items-center gap-2 px-3 py-1.5"
-              >
-                <span className="w-5 text-center text-[10px] font-bold text-ink-faint tabular-nums shrink-0">
-                  {entry.impliedProbability != null ? index + 1 : "—"}
-                </span>
-                <TeamFlag team={entry.team} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <TeamCode
-                    code={entry.team.fifa_code}
-                    className="text-xs text-ink tracking-normal"
-                  />
-                </div>
-                <span
-                  className={`text-[11px] font-semibold tabular-nums shrink-0 ${
-                    entry.impliedProbability != null
-                      ? "text-ink-muted"
-                      : "text-ink-faint"
-                  }`}
+            {entries.map((entry, index) => {
+              const championPts = tournamentPlacePoints(entry.team, "champion");
+              return (
+                <li
+                  key={entry.team.id}
+                  className="flex items-center gap-2 px-3 py-1.5"
                 >
-                  {entry.impliedProbability != null
-                    ? formatWinChance(entry.impliedProbability)
-                    : "—"}
-                </span>
-              </li>
-            ))}
+                  <span className="w-5 text-center text-[10px] font-bold text-ink-faint tabular-nums shrink-0">
+                    {entry.impliedProbability != null ? index + 1 : "—"}
+                  </span>
+                  <TeamFlag team={entry.team} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <TeamCode
+                      code={entry.team.fifa_code}
+                      className="text-xs text-ink tracking-normal"
+                    />
+                  </div>
+                  {championPts > 0 && (
+                    <span
+                      className="text-[11px] font-bold text-mexico tabular-nums shrink-0"
+                      title="Points if picked as Champion and they win it all"
+                    >
+                      +{championPts} pts
+                    </span>
+                  )}
+                  <span
+                    className={`w-10 text-right text-[11px] font-semibold tabular-nums shrink-0 ${
+                      entry.impliedProbability != null
+                        ? "text-ink-muted"
+                        : "text-ink-faint"
+                    }`}
+                  >
+                    {entry.impliedProbability != null
+                      ? formatWinChance(entry.impliedProbability)
+                      : "—"}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </div>
       )}
