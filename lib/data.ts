@@ -368,7 +368,6 @@ export function computeFunStats(
   mostExactScores: { name: string; count: number } | null;
   mostMiraclePoints: { name: string; points: number } | null;
   bestPerfectDay: { name: string; count: number } | null;
-  biggestMover: { name: string; delta: number } | null;
 } {
   const leader = [...leaderboard].sort(
     (a, b) => b.totalPoints - a.totalPoints
@@ -408,6 +407,5 @@ export function computeFunStats(
       ? { name: mostMiracle.displayName, points: mostMiracle.miraclePoints }
       : null,
     bestPerfectDay,
-    biggestMover: null,
   };
 }

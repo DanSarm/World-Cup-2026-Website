@@ -37,6 +37,7 @@ export default async function PicksPage() {
       myPodium={myPodium}
       podiumLocked={podiumLocked}
       worldCupKickoff={worldCupKickoff}
+      championProbabilities={settings.champion_probabilities}
     />
   );
 }

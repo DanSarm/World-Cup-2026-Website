@@ -12,7 +12,7 @@ export function PodiumConfirmModal({
   onCancel,
 }: {
   open: boolean;
-  picks: { medal: string; label: string; team: Team }[];
+  picks: { medal: string; label: string; team: Team; maxPoints: number }[];
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -51,7 +51,7 @@ export function PodiumConfirmModal({
         </div>
 
         <div className="rounded-xl bg-cream/80 border border-ink/5 divide-y divide-ink/5 overflow-hidden">
-          {picks.map(({ medal, label, team }) => (
+          {picks.map(({ medal, label, team, maxPoints }) => (
             <div key={label} className="flex items-center gap-3 px-3 py-2.5">
               <span className="text-lg w-7 text-center shrink-0">{medal}</span>
               <TeamFlag team={team} size="sm" />
@@ -59,6 +59,9 @@ export function PodiumConfirmModal({
                 <TeamCode code={team.fifa_code} className="!text-sm text-ink" />
                 <p className="text-[11px] text-ink-muted">{label}</p>
               </div>
+              <span className="text-[10px] font-medium text-ink-faint tabular-nums shrink-0">
+                +{maxPoints} if correct
+              </span>
             </div>
           ))}
         </div>

@@ -57,21 +57,32 @@ export default async function HomePage() {
         myPodium={myPodium}
         locked={podiumLocked}
         worldCupKickoff={worldCupKickoff}
+        championProbabilities={settings.champion_probabilities}
       />
 
       {upcomingMatch ? (
-        <section className="space-y-3">
-          <h2 className="section-title px-0.5">Upcoming Game</h2>
+        <section className="card p-0 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-ink/5 bg-cream/30">
+            <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
+              Upcoming game
+            </h2>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Make your pick, then see what everyone else is going with
+            </p>
+          </div>
           <MatchCard
             match={upcomingMatch}
             prediction={predMap.get(upcomingMatch.id)}
             scoringConfig={scoringConfig}
             showPickCountdown
+            embedded
           />
           <MatchCommunityPicks
             match={upcomingMatch}
             picks={communityPicks}
             currentPlayerId={session.id}
+            scoringConfig={scoringConfig}
+            embedded
           />
         </section>
       ) : (

@@ -1,4 +1,9 @@
 import type { CommunityMatchPick } from "@/lib/data";
+import {
+  previewPickRewards,
+  DEFAULT_SCORING_CONFIG,
+  type ScoringConfig,
+} from "@/lib/scoringConfig";
 import type { Match } from "@/lib/types";
 import { isKnockoutStage } from "@/lib/types";
 
@@ -24,33 +29,56 @@ function formatPickScore(
   return code ? `${score} · ${code}` : score;
 }
 
+function maxPointsIfCorrect(
+  match: Match,
+  pick: CommunityMatchPick,
+  scoringConfig: ScoringConfig
+): number | null {
+  if (match.status === "final") return null;
+
+  const isKO = isKnockoutStage(match.stage);
+  const isTie = pick.predHomeScore === pick.predAwayScore;
+  if (isKO && isTie && !pick.predWinnerTeamId) return null;
+
+  return previewPickRewards(
+    match,
+    pick.predHomeScore,
+    pick.predAwayScore,
+    scoringConfig,
+    pick.predWinnerTeamId
+  ).maxPoints;
+}
+
 export function MatchCommunityPicks({
   match,
   picks,
   currentPlayerId,
+  embedded = false,
+  scoringConfig = DEFAULT_SCORING_CONFIG,
 }: {
   match: Match;
   picks: CommunityMatchPick[];
   currentPlayerId: string;
+  embedded?: boolean;
+  scoringConfig?: ScoringConfig;
 }) {
-  return (
-    <div className="card p-0 overflow-hidden">
-      <div className="px-4 py-3 border-b border-ink/5">
-        <h3 className="text-sm font-bold text-usa uppercase tracking-wide">
-          Everyone&apos;s picks
-        </h3>
-        <p className="text-xs text-ink-muted mt-0.5">
-          What the group is predicting for this match
-        </p>
-      </div>
+  const sortedPicks = [...picks].sort((a, b) => {
+    const aPts = maxPointsIfCorrect(match, a, scoringConfig) ?? -1;
+    const bPts = maxPointsIfCorrect(match, b, scoringConfig) ?? -1;
+    if (bPts !== aPts) return bPts - aPts;
+    return a.displayName.localeCompare(b.displayName);
+  });
 
-      {picks.length === 0 ? (
+  const content = (
+    <>
+      {sortedPicks.length === 0 ? (
         <p className="text-center text-sm text-ink-faint py-6 px-4">
           No picks yet — be the first!
         </p>
       ) : (
-        picks.map((pick) => {
+        sortedPicks.map((pick) => {
           const isYou = pick.playerId === currentPlayerId;
+          const maxPts = maxPointsIfCorrect(match, pick, scoringConfig);
           return (
             <div
               key={pick.playerId}
@@ -67,13 +95,47 @@ export function MatchCommunityPicks({
                   </span>
                 )}
               </span>
-              <span className="font-extrabold text-ink tabular-nums shrink-0">
-                {formatPickScore(pick, match)}
+              <span className="shrink-0 text-right leading-tight">
+                <span className="font-extrabold text-ink tabular-nums">
+                  {formatPickScore(pick, match)}
+                </span>
+                {maxPts != null && (
+                  <span className="block text-[10px] font-medium text-ink-faint tabular-nums mt-0.5">
+                    +{maxPts} if correct
+                  </span>
+                )}
               </span>
             </div>
           );
         })
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="border-t border-ink/8 bg-cream/20">
+        <div className="px-4 py-3 border-b border-ink/5">
+          <h3 className="text-xs font-bold text-ink-muted uppercase tracking-wide">
+            Everyone&apos;s picks
+          </h3>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="px-4 py-3 border-b border-ink/5">
+        <h3 className="text-sm font-bold text-usa uppercase tracking-wide">
+          Everyone&apos;s picks
+        </h3>
+        <p className="text-xs text-ink-muted mt-0.5">
+          What the group is predicting for this match
+        </p>
+      </div>
+      {content}
     </div>
   );
 }

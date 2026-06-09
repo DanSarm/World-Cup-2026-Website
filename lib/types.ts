@@ -237,6 +237,7 @@ export interface LeaderboardEntry {
   exactScores: number;
   correctResults: number;
   knockoutCorrect: number;
+  picksMade: number;
   beforeCupPoints: number;
   finalsChallengePoints: number;
   rank: number;

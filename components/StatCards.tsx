@@ -5,7 +5,6 @@ interface StatCardsProps {
   mostExactScores: { name: string; count: number } | null;
   mostMiraclePoints: { name: string; points: number } | null;
   bestPerfectDay: { name: string; count: number } | null;
-  biggestMover: { name: string; delta: number } | null;
 }
 
 export function StatCards({
@@ -13,53 +12,49 @@ export function StatCards({
   mostExactScores,
   mostMiraclePoints,
   bestPerfectDay,
-  biggestMover,
 }: StatCardsProps) {
+  const cards = [
+    {
+      icon: "🏆",
+      label: "Most points",
+      value: mostPoints ? `${mostPoints.name} · ${mostPoints.points}` : "—",
+    },
+    {
+      icon: "🎯",
+      label: "Most exact scores",
+      value: mostExactScores
+        ? `${mostExactScores.name} · ${mostExactScores.count}`
+        : "—",
+    },
+    {
+      icon: "🔥",
+      label: "Most bonus pts",
+      value: mostMiraclePoints
+        ? `${mostMiraclePoints.name} · ${mostMiraclePoints.points}`
+        : "—",
+    },
+    {
+      icon: "🎉",
+      label: "Best perfect day",
+      value: bestPerfectDay
+        ? `${bestPerfectDay.name} · ${bestPerfectDay.count}`
+        : "—",
+    },
+  ];
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <StatCard
-        icon="🏆"
-        label="Most Points"
-        value={
-          mostPoints ? `${mostPoints.name} (${mostPoints.points})` : "—"
-        }
-      />
-      <StatCard
-        icon="🎯"
-        label="Most Exact Scores"
-        value={
-          mostExactScores
-            ? `${mostExactScores.name} (${mostExactScores.count})`
-            : "—"
-        }
-      />
-      <StatCard
-        icon="🔥"
-        label="Most Miracle Points"
-        value={
-          mostMiraclePoints
-            ? `${mostMiraclePoints.name} (${mostMiraclePoints.points})`
-            : "—"
-        }
-      />
-      <StatCard
-        icon="🎉"
-        label="Best Perfect Day"
-        value={
-          bestPerfectDay
-            ? `${bestPerfectDay.name} (${bestPerfectDay.count})`
-            : "—"
-        }
-      />
-      <StatCard
-        icon="🚀"
-        label="Biggest Mover"
-        value={
-          biggestMover
-            ? `${biggestMover.name} (+${biggestMover.delta})`
-            : "—"
-        }
-      />
-    </div>
+    <section className="space-y-2">
+      <h2 className="section-title px-0.5">Highlights</h2>
+      <div className="grid grid-cols-2 gap-3">
+        {cards.map((card) => (
+          <StatCard
+            key={card.label}
+            icon={card.icon}
+            label={card.label}
+            value={card.value}
+          />
+        ))}
+      </div>
+    </section>
   );
 }

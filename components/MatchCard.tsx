@@ -12,6 +12,7 @@ import { hasSavedPick } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
+import { hasAnyBonus } from "@/lib/matchBonuses";
 import { MatchOddsBar } from "./MatchOddsBar";
 import { PickCountdownBadge } from "./PickCountdown";
 import { PickLockButton } from "./PickLockButton";
@@ -22,6 +23,8 @@ interface MatchCardProps {
   scoringConfig?: ScoringConfig;
   onPickChange?: (matchId: string, home: number, away: number) => void;
   showPickCountdown?: boolean;
+  /** Render inside a parent card (no outer card shell). */
+  embedded?: boolean;
 }
 
 export function MatchCard({
@@ -30,6 +33,7 @@ export function MatchCard({
   scoringConfig = DEFAULT_SCORING_CONFIG,
   onPickChange,
   showPickCountdown = false,
+  embedded = false,
 }: MatchCardProps) {
   const router = useRouter();
   const saved = hasSavedPick(prediction);
@@ -181,7 +185,11 @@ export function MatchCard({
   ]);
 
   return (
-    <article className="card space-y-4">
+    <article
+      className={
+        embedded ? "px-4 sm:px-5 py-4 space-y-4" : "card space-y-4"
+      }
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
           <p className="text-sm font-semibold text-ink">
@@ -193,22 +201,8 @@ export function MatchCard({
           )}
         </div>
         <div className="flex items-start gap-2 shrink-0">
-          {showPickCountdown ? (
+          {showPickCountdown && (
             <PickCountdownBadge kickoffAt={match.kickoff_at} />
-          ) : (
-            exactPointsPreview != null && (
-              <div
-                className="shrink-0 text-right leading-tight"
-                title="Points if your exact score is correct"
-              >
-                <span className="text-base font-extrabold text-mexico tabular-nums">
-                  +{exactPointsPreview}
-                </span>
-                <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-                  pts
-                </span>
-              </div>
-            )
           )}
           {pickable && (
             <PickLockButton
@@ -236,7 +230,17 @@ export function MatchCard({
 
       <MatchOddsBar match={match} />
 
-      <MatchBonusPills match={match} />
+      {(hasAnyBonus(match) || exactPointsPreview != null) && (
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+          <MatchBonusPills match={match} />
+          {exactPointsPreview != null && (
+            <PickPointsPreview
+              points={exactPointsPreview}
+              className="ml-auto shrink-0"
+            />
+          )}
+        </div>
+      )}
 
       {match.status === "final" && match.home_score !== null && (
         <div className="alert-info">
@@ -301,6 +305,28 @@ export function MatchCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function PickPointsPreview({
+  points,
+  className = "",
+}: {
+  points: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`text-right leading-tight ${className}`}
+      title="Max points if your exact score is correct"
+    >
+      <span className="text-base font-extrabold text-mexico tabular-nums">
+        +{points}
+      </span>
+      <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+        if exact
+      </span>
+    </div>
   );
 }
 

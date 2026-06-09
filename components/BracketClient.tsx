@@ -2,6 +2,7 @@
 
 import { PageHeader } from "./PageHeader";
 import { GroupStandingsPanel } from "./GroupStandingsPanel";
+import { KnockoutBracketPanel } from "./KnockoutBracketPanel";
 import type { Match, MatchPrediction } from "@/lib/types";
 
 interface BracketClientProps {
@@ -21,7 +22,10 @@ export function BracketClient({ matches, predictions }: BracketClientProps) {
       />
 
       {hasGroupStage ? (
-        <GroupStandingsPanel matches={matches} predictions={predictions} />
+        <>
+          <GroupStandingsPanel matches={matches} predictions={predictions} />
+          <KnockoutBracketPanel matches={matches} predictions={predictions} />
+        </>
       ) : (
         <div className="card text-center py-10 text-ink-muted text-sm">
           Group-stage matches aren&apos;t available yet

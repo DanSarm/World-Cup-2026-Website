@@ -591,6 +591,7 @@ export function calculateLeaderboard(
       exactScores,
       correctResults,
       knockoutCorrect,
+      picksMade: playerPreds.length,
       beforeCupPoints,
       finalsChallengePoints,
       rank: 0,

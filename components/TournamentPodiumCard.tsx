@@ -3,6 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTournamentPodiumAction } from "@/lib/actions";
+import {
+  previewPodiumPlacePoints,
+  PODIUM_FORM_PLACE,
+} from "@/lib/podiumPreview";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { PickCountdownBadge } from "./PickCountdown";
@@ -15,6 +19,7 @@ interface TournamentPodiumCardProps {
   /** Admin lock or World Cup already started */
   locked: boolean;
   worldCupKickoff: string | null;
+  championProbabilities?: Record<string, number>;
 }
 
 const PLACES = [
@@ -43,16 +48,22 @@ export function TournamentPodiumCard({
   myPodium,
   locked,
   worldCupKickoff,
+  championProbabilities,
 }: TournamentPodiumCardProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmPicks, setConfirmPicks] = useState<
-    { medal: string; label: string; team: Team }[]
+    { medal: string; label: string; team: Team; maxPoints: number }[]
   >([]);
   const [pendingForm, setPendingForm] = useState<FormData | null>(null);
   const [pending, startTransition] = useTransition();
+  const [selections, setSelections] = useState<Record<string, string>>(() => ({
+    firstPlaceTeamId: myPodium?.first_place_team_id ?? "",
+    secondPlaceTeamId: myPodium?.second_place_team_id ?? "",
+    thirdPlaceTeamId: myPodium?.third_place_team_id ?? "",
+  }));
 
   const sortedTeams = [...teams].sort((a, b) =>
     a.fifa_code.localeCompare(b.fifa_code)
@@ -67,7 +78,7 @@ export function TournamentPodiumCard({
     if (!form?.reportValidity()) return;
 
     const fd = new FormData(form);
-    const picks: { medal: string; label: string; team: Team }[] = [];
+    const picks: { medal: string; label: string; team: Team; maxPoints: number }[] = [];
 
     for (const place of PLACES) {
       const teamId = fd.get(place.key) as string;
@@ -76,7 +87,16 @@ export function TournamentPodiumCard({
         setError("Pick a team for each place");
         return;
       }
-      picks.push({ medal: place.medal, label: place.label, team });
+      picks.push({
+        medal: place.medal,
+        label: place.label,
+        team,
+        maxPoints: previewPodiumPlacePoints(
+          PODIUM_FORM_PLACE[place.key],
+          teamId,
+          championProbabilities
+        ),
+      });
     }
 
     setConfirmPicks(picks);
@@ -129,19 +149,30 @@ export function TournamentPodiumCard({
 
         {readOnly ? (
           <div className="card space-y-3">
-            {PLACES.map(({ label, medal, field }) => {
+            {PLACES.map(({ label, medal, field, key }) => {
               const teamId = myPodium?.[field];
               const team = teamId ? teams.find((t) => t.id === teamId) : null;
+              const maxPts =
+                team && teamId
+                  ? previewPodiumPlacePoints(
+                      PODIUM_FORM_PLACE[key],
+                      teamId,
+                      championProbabilities
+                    )
+                  : null;
               return (
                 <div key={field} className="flex items-center gap-3 py-1">
                   <span className="text-xl w-8 text-center shrink-0">{medal}</span>
                   {team ? (
                     <>
                       <TeamFlag team={team} size="sm" />
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <TeamCode code={team.fifa_code} prominent className="text-ink" />
                         <p className="text-xs text-ink-muted">{label}</p>
                       </div>
+                      {maxPts != null && (
+                        <PodiumPointsHint points={maxPts} />
+                      )}
                     </>
                   ) : (
                     <span className="text-sm text-ink-faint">
@@ -165,18 +196,34 @@ export function TournamentPodiumCard({
             </p>
 
             {PLACES.map(({ key, label, medal, field }) => {
-              const defaultValue = myPodium?.[field] ?? "";
-              const selected = teams.find((t) => t.id === defaultValue);
+              const selectedId = selections[key];
+              const selected = teams.find((t) => t.id === selectedId);
+              const maxPts = selectedId
+                ? previewPodiumPlacePoints(
+                    PODIUM_FORM_PLACE[key],
+                    selectedId,
+                    championProbabilities
+                  )
+                : null;
               return (
                 <div key={key}>
-                  <label className="label flex items-center gap-2">
-                    <span>{medal}</span>
-                    {selected && <TeamFlag team={selected} size="xs" />}
-                    {label}
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="label flex items-center gap-2 mb-0">
+                      <span>{medal}</span>
+                      {selected && <TeamFlag team={selected} size="xs" />}
+                      {label}
+                    </label>
+                    {maxPts != null && <PodiumPointsHint points={maxPts} />}
+                  </div>
                   <select
                     name={key}
-                    defaultValue={defaultValue}
+                    value={selectedId}
+                    onChange={(e) =>
+                      setSelections((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
                     required
                     className="input-field text-sm py-2.5"
                   >
@@ -218,5 +265,13 @@ export function TournamentPodiumCard({
         }}
       />
     </>
+  );
+}
+
+function PodiumPointsHint({ points }: { points: number }) {
+  return (
+    <span className="text-[10px] font-medium text-ink-faint tabular-nums shrink-0">
+      +{points} if correct
+    </span>
   );
 }
