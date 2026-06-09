@@ -10,13 +10,10 @@ function entryPoints(entry: LeaderboardEntry): number {
 export function rerankLeaderboardEntries(
   entries: LeaderboardEntry[]
 ): LeaderboardEntry[] {
+  // Ties keep the server order (entry.rank), which already encodes the
+  // full tie-breakers: potential points, exact scores, etc.
   return [...entries]
-    .sort(
-      (a, b) =>
-        entryPoints(b) - entryPoints(a) ||
-        b.exactScores - a.exactScores ||
-        a.displayName.localeCompare(b.displayName)
-    )
+    .sort((a, b) => entryPoints(b) - entryPoints(a) || a.rank - b.rank)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 }
 

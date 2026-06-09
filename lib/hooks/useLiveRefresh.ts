@@ -110,7 +110,8 @@ export function mergeLeaderboard(
       .sort((a, b) => {
         const aPts = a.provisionalTotalPoints ?? a.totalPoints;
         const bPts = b.provisionalTotalPoints ?? b.totalPoints;
-        return bPts - aPts;
+        // Ties keep the server order, which encodes potential points.
+        return bPts - aPts || a.rank - b.rank;
       })
       .map((e, i) => ({ ...e, rank: i + 1 }));
   }

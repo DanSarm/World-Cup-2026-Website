@@ -39,7 +39,10 @@ export function HomeTopFive({
     <section className="space-y-3">
       <div className="flex items-center justify-between px-0.5">
         <h2 className="section-title">
-          Top 5
+          Leaderboard
+          <span className="ml-2 text-xs font-semibold text-ink-faint align-middle">
+            Top 5
+          </span>
           {hasLive && (
             <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-canada align-middle">
               · Live

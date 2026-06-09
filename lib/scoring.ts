@@ -18,6 +18,7 @@ import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
   capGroupMatchPoints,
   outcomeBonusForScoreline,
+  previewPickRewards,
   scoringConfigFromSettings,
   type ScoringConfig,
   DEFAULT_SCORING_CONFIG,
@@ -547,6 +548,10 @@ export function calculateLeaderboard(
     );
   }
 
+  // Tie-breaker only (never displayed): max points a player could still
+  // earn from picks on undecided matches and podium positions.
+  const potentialByPlayer = new Map<string, number>();
+
   const entries: LeaderboardEntry[] = players.map((player) => {
     const playerPreds = confirmedPredictions.filter(
       (p) => p.player_id === player.id
@@ -562,11 +567,22 @@ export function calculateLeaderboard(
     let knockoutCorrect = 0;
 
     let livePoints = 0;
+    let potentialPoints = 0;
 
     for (const match of matches) {
       const pred = predByMatchId.get(match.id);
       const effective = getEffectiveMatchPrediction(match, pred);
       if (!effective) continue;
+
+      if (match.status !== "final") {
+        potentialPoints += previewPickRewards(
+          match,
+          effective.pred_home_score,
+          effective.pred_away_score,
+          scoringConfig,
+          effective.pred_winner_team_id
+        ).maxPoints;
+      }
 
       if (match.status === "final") {
         const result = scoreMatchPrediction(match, effective, scoringConfig);
@@ -594,6 +610,28 @@ export function calculateLeaderboard(
       ? calculatePodiumPoints(podiumPred, actualResults, teamsById)
       : { total: 0, champion: 0, runnerUp: 0, thirdPlace: 0 };
     const beforeCupPoints = tournamentPicks.total;
+
+    if (podiumPred) {
+      if (!actualResults.champion && podiumPred.first_place_team_id) {
+        potentialPoints += tournamentPlacePoints(
+          teamsById.get(podiumPred.first_place_team_id),
+          "champion"
+        );
+      }
+      if (!actualResults.runner_up && podiumPred.second_place_team_id) {
+        potentialPoints += tournamentPlacePoints(
+          teamsById.get(podiumPred.second_place_team_id),
+          "runnerUp"
+        );
+      }
+      if (!actualResults.third_place && podiumPred.third_place_team_id) {
+        potentialPoints += tournamentPlacePoints(
+          teamsById.get(podiumPred.third_place_team_id),
+          "thirdPlace"
+        );
+      }
+    }
+    potentialByPlayer.set(player.id, potentialPoints);
 
     const finalsPred = finalsByPlayer.get(player.id);
     const finalsChallengePoints = finalsPred
@@ -667,6 +705,9 @@ export function calculateLeaderboard(
     const aPts = sortPoints(a);
     const bPts = sortPoints(b);
     if (bPts !== aPts) return bPts - aPts;
+    const aPotential = potentialByPlayer.get(a.playerId) ?? 0;
+    const bPotential = potentialByPlayer.get(b.playerId) ?? 0;
+    if (bPotential !== aPotential) return bPotential - aPotential;
     return compareTieBreakers(a, b);
   });
 
