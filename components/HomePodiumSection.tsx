@@ -31,7 +31,7 @@ export async function HomePodiumSection({
       worldCupKickoff={worldCupKickoff}
       championProbabilities={championProbabilities}
       companion={
-        <div className="w-full xl:w-[320px] shrink-0 flex flex-col h-full min-h-0 overflow-hidden">
+        <div className="home-podium-companion w-full xl:w-[320px] shrink-0 flex flex-col min-h-0 overflow-hidden">
           <ChampionOddsPanel entries={championOdds} />
         </div>
       }

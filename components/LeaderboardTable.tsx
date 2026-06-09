@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { LeaderboardEntry } from "@/lib/types";
-import type { FlagSize } from "@/lib/flags";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
 import { formatMoney } from "@/lib/payouts";
@@ -42,12 +41,6 @@ export function LeaderboardTable({
     return "";
   };
 
-  const podiumFlagSize = (rank: number): FlagSize => {
-    if (rank === 1) return "md";
-    if (rank === 2) return "sm";
-    return "xs";
-  };
-
   const renderEntry = (entry: LeaderboardEntry) => {
     const displayValue =
       hasLiveScoring && entry.provisionalTotalPoints != null
@@ -72,10 +65,10 @@ export function LeaderboardTable({
             <PlayerPodiumFlags
               picks={entry.podiumPicks}
               fallbackEmoji={entry.avatarEmoji}
-              size={entry.rank <= 3 ? podiumFlagSize(entry.rank) : "xs"}
-              className="!w-auto"
+              size="xs"
+              className="lb-entry-flags !w-auto"
             />
-            <span className="truncate">{entry.displayName}</span>
+            <span className="lb-entry-name-text">{entry.displayName}</span>
           </p>
           <p className="lb-entry-meta">
             {entry.picksMade} {entry.picksMade === 1 ? "pick" : "picks"}
@@ -85,7 +78,10 @@ export function LeaderboardTable({
           </p>
         </div>
 
-        <RecentPickFormDots form={entry.recentForm ?? []} />
+        <RecentPickFormDots
+          form={entry.recentForm ?? []}
+          className="lb-entry-form"
+        />
 
         <div className="lb-entry-score shrink-0 text-right">
           <p className="lb-entry-score-value">{displayValue}</p>
@@ -112,9 +108,12 @@ export function LeaderboardTable({
     <div className="card p-0 overflow-hidden">
       <div className="p-3 sm:p-4 border-b border-ink/5 space-y-3">
         {hasLiveScoring && (
-          <p className="text-xs font-semibold text-canada">
-            Live match in progress — totals include provisional points from the
-            current score
+          <p className="text-xs font-semibold text-canada leading-snug">
+            <span className="sm:hidden">Live — totals include provisional points</span>
+            <span className="hidden sm:inline">
+              Live match in progress — totals include provisional points from the
+              current score
+            </span>
           </p>
         )}
         <div className="segmented-light">

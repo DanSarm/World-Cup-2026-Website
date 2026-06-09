@@ -486,7 +486,7 @@ function TeamSide({
 }) {
   return (
     <div
-      className={`flex flex-col gap-1 min-w-0 max-w-[7.5rem] md:max-w-[9rem] ${
+      className={`flex flex-col gap-1 min-w-0 max-w-[5.75rem] sm:max-w-[7.5rem] md:max-w-[9rem] ${
         align === "right"
           ? "items-end justify-self-end text-right"
           : "items-start justify-self-start text-left"
@@ -496,7 +496,7 @@ function TeamSide({
         team={team}
         size="xl"
         highRes
-        className="shrink-0 match-card-flag"
+        className="shrink-0 match-card-flag w-14 h-[42px] sm:w-20 sm:h-[60px]"
       />
       <TeamMeta team={team} label={label} align={align} />
     </div>

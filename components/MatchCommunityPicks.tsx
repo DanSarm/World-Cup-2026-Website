@@ -100,38 +100,41 @@ export function MatchCommunityPicks({
           return (
             <div
               key={pick.playerId}
-              className={`lb-row ${isYou ? "bg-usa/5" : ""}`}
+              className={`lb-row lb-row--community ${isYou ? "bg-usa/5" : ""}`}
             >
               <PlayerPodiumFlags
                 picks={pick.podiumPicks}
                 fallbackEmoji={pick.avatarEmoji}
+                size="xs"
+                className="lb-row-flags"
               />
-              <span className="flex-1 min-w-0 font-semibold text-ink truncate">
-                {pick.displayName}
+              <span className="lb-row-main font-semibold text-ink">
+                <span className="lb-entry-name-text">{pick.displayName}</span>
                 {isYou && (
                   <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wide text-usa">
                     You
                   </span>
                 )}
               </span>
-              <span className="shrink-0 text-right leading-tight flex items-center gap-2">
-                <RecentPickFormDots form={pick.recentForm ?? []} />
-                <span>
-                  <span className="font-extrabold text-ink tabular-nums">
-                    {formatPickScore(pick, match)}
-                  </span>
-                  {livePts != null ? (
-                    <span className="block text-[10px] font-medium text-mexico tabular-nums mt-0.5">
-                      +{livePts} pts if it ended now
-                    </span>
-                  ) : (
-                    maxPts != null && (
-                      <span className="block text-[10px] font-medium text-ink-faint tabular-nums mt-0.5">
-                        +{maxPts} if correct
-                      </span>
-                    )
-                  )}
+              <RecentPickFormDots
+                form={pick.recentForm ?? []}
+                className="lb-entry-form"
+              />
+              <span className="lb-row-pick">
+                <span className="font-extrabold text-ink tabular-nums">
+                  {formatPickScore(pick, match)}
                 </span>
+                {livePts != null ? (
+                  <span className="block text-[10px] font-medium text-mexico tabular-nums mt-0.5">
+                    +{livePts} live
+                  </span>
+                ) : (
+                  maxPts != null && (
+                    <span className="block text-[10px] font-medium text-ink-faint tabular-nums mt-0.5">
+                      +{maxPts} max
+                    </span>
+                  )
+                )}
               </span>
             </div>
           );

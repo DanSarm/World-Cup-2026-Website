@@ -80,8 +80,8 @@ export function HomeTopFive({
               : entry.totalPoints;
 
           return (
-            <div key={entry.playerId} className="lb-row">
-              <span className="w-7 text-center font-bold text-ink-faint text-sm">
+            <div key={entry.playerId} className="lb-row lb-row--compact">
+              <span className="lb-row-rank">
                 {entry.rank === 1
                   ? "🥇"
                   : entry.rank === 2
@@ -90,16 +90,20 @@ export function HomeTopFive({
                       ? "🥉"
                       : entry.rank}
               </span>
-              <span className="flex-1 font-semibold text-ink truncate flex items-center gap-1.5 min-w-0">
+              <span className="lb-row-main">
                 <PlayerPodiumFlags
                   picks={entry.podiumPicks}
                   fallbackEmoji={entry.avatarEmoji}
-                  className="!w-auto"
+                  size="xs"
+                  className="lb-entry-flags !w-auto"
                 />
-                <span className="truncate">{entry.displayName}</span>
+                <span className="lb-entry-name-text">{entry.displayName}</span>
               </span>
-              <RecentPickFormDots form={entry.recentForm ?? []} />
-              <span className="font-extrabold text-usa tabular-nums text-right shrink-0">
+              <RecentPickFormDots
+                form={entry.recentForm ?? []}
+                className="lb-entry-form"
+              />
+              <span className="lb-row-score">
                 {displayPoints}
                 <span className="text-xs font-normal text-ink-faint ml-0.5">
                   pts

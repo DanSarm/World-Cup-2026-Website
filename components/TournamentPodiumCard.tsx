@@ -131,7 +131,7 @@ export function TournamentPodiumCard({
   }
 
   const header = (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
       <div className="space-y-0.5 min-w-0">
         <h2 className="section-title">Tournament Podium</h2>
         {!readOnly && (
@@ -230,7 +230,7 @@ export function TournamentPodiumCard({
   const bodyContent = readOnly ? readOnlyBody : editBody;
   const bodyClassName = readOnly ? undefined : "space-y-4";
   const cardClassName = companion
-    ? `card flex flex-col flex-1 min-w-0 h-full min-h-0 overflow-hidden ${
+    ? `home-podium-card card flex flex-col flex-1 min-w-0 h-full min-h-0 overflow-hidden ${
         readOnly ? "p-0" : "overflow-y-auto"
       } ${bodyClassName ?? ""}`
     : `card ${readOnly ? "p-0 overflow-hidden" : ""} ${bodyClassName ?? "space-y-3"}`;
@@ -362,8 +362,10 @@ function PodiumPointsHint({
   return (
     <span
       className={`home-podium-points home-podium-points--${tier} tabular-nums shrink-0`}
+      title={`+${points} if correct`}
     >
-      +{points} if correct
+      +{points}
+      <span className="home-podium-points-suffix"> if correct</span>
     </span>
   );
 }
