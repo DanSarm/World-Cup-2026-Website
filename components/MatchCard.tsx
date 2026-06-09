@@ -8,7 +8,9 @@ import { formatKickoff, getLockStatus, canPickMatch } from "@/lib/utils";
 import { getStageLabel, isKnockoutStage } from "@/lib/types";
 import type { Match, MatchPrediction, Team } from "@/lib/types";
 import { previewPickRewards, DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/scoringConfig";
-import { hasSavedPick } from "@/lib/pickUtils";
+import { scoreMatchPrediction } from "@/lib/scoring";
+import { hasSavedPick, getEffectiveMatchPrediction, usesDefaultMissingPick } from "@/lib/pickUtils";
+import { isMatchLive } from "@/lib/matchLive";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
@@ -16,6 +18,7 @@ import { hasAnyBonus } from "@/lib/matchBonuses";
 import { MatchOddsBar } from "./MatchOddsBar";
 import { PickCountdownBadge } from "./PickCountdown";
 import { PickLockButton } from "./PickLockButton";
+import { LivePill } from "./LivePill";
 
 interface MatchCardProps {
   match: Match;
@@ -37,6 +40,8 @@ export function MatchCard({
 }: MatchCardProps) {
   const router = useRouter();
   const saved = hasSavedPick(prediction);
+  const isDefaultPick = usesDefaultMissingPick(match, prediction);
+  const effectivePrediction = getEffectiveMatchPrediction(match, prediction);
   const [homeScore, setHomeScore] = useState<number | null>(
     saved ? (prediction?.pred_home_score ?? null) : null
   );
@@ -52,6 +57,7 @@ export function MatchCard({
 
   const lock = getLockStatus(match);
   const pickable = canPickMatch(match);
+  const isLive = isMatchLive(match);
   const isKO = isKnockoutStage(match.stage);
   const needsWinner =
     isKO && homeScore !== null && awayScore !== null && homeScore === awayScore;
@@ -119,18 +125,14 @@ export function MatchCard({
 
   const displayHome = pickable
     ? homeScore
-    : saved
-      ? (prediction?.pred_home_score ?? null)
-      : null;
+    : (effectivePrediction?.pred_home_score ?? null);
   const displayAway = pickable
     ? awayScore
-    : saved
-      ? (prediction?.pred_away_score ?? null)
-      : null;
+    : (effectivePrediction?.pred_away_score ?? null);
   const showScores =
     match.home_team_id &&
     match.away_team_id &&
-    (pickable || saved);
+    (pickable || effectivePrediction != null);
 
   function handleWinnerPick(teamId: string) {
     setWinnerId(teamId);
@@ -148,20 +150,14 @@ export function MatchCard({
       predHome = homeScore;
       predAway = awayScore;
     } else {
-      if (!saved) return null;
-      if (
-        prediction?.pred_home_score == null ||
-        prediction?.pred_away_score == null
-      ) {
-        return null;
-      }
-      predHome = prediction.pred_home_score;
-      predAway = prediction.pred_away_score;
+      if (!effectivePrediction) return null;
+      predHome = effectivePrediction.pred_home_score;
+      predAway = effectivePrediction.pred_away_score;
     }
 
     const predWinner = pickable
       ? winnerId
-      : (prediction?.pred_winner_team_id ?? winnerId);
+      : (effectivePrediction?.pred_winner_team_id ?? winnerId);
 
     if (isKO && predHome === predAway && !predWinner) return null;
 
@@ -175,14 +171,19 @@ export function MatchCard({
   }, [
     match,
     pickable,
-    saved,
+    effectivePrediction,
     homeScore,
     awayScore,
-    winnerId,
-    prediction,
     isKO,
     scoringConfig,
   ]);
+
+  const livePointsPreview = useMemo(() => {
+    if (!isLive || !effectivePrediction) return null;
+    return scoreMatchPrediction(match, effectivePrediction, scoringConfig, {
+      allowLive: true,
+    }).points;
+  }, [isLive, effectivePrediction, match, scoringConfig]);
 
   return (
     <article
@@ -201,7 +202,8 @@ export function MatchCard({
           )}
         </div>
         <div className="flex items-start gap-2 shrink-0">
-          {showPickCountdown && (
+          {isLive && <LivePill />}
+          {showPickCountdown && !isLive && (
             <PickCountdownBadge kickoffAt={match.kickoff_at} />
           )}
           {pickable && (
@@ -226,6 +228,8 @@ export function MatchCard({
         displayAway={displayAway}
         onHomeChange={handleHomeChange}
         onAwayChange={handleAwayChange}
+        liveHomeScore={isLive ? match.home_score : null}
+        liveAwayScore={isLive ? match.away_score : null}
       />
 
       <MatchOddsBar match={match} />
@@ -242,15 +246,57 @@ export function MatchCard({
         </div>
       )}
 
+      {isLive && match.home_score !== null && match.away_score !== null && (
+        <div className="rounded-xl border border-canada/25 bg-canada/5 px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-canada">
+              Live score
+            </p>
+            {match.live_updated_at && (
+              <p className="text-[10px] text-ink-faint tabular-nums">
+                Updated{" "}
+                {new Date(match.live_updated_at).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </p>
+            )}
+          </div>
+          {(saved || isDefaultPick) && effectivePrediction && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <p className="text-ink-muted">
+                Your pick:{" "}
+                <span className="font-bold text-ink tabular-nums">
+                  {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
+                </span>
+                {isDefaultPick && (
+                  <span className="text-ink-faint font-normal"> (default)</span>
+                )}
+              </p>
+              {livePointsPreview != null && (
+                <p className="font-semibold text-mexico tabular-nums">
+                  {livePointsPreview > 0
+                    ? `+${livePointsPreview} pts if it ended now`
+                    : "0 pts if it ended now"}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {match.status === "final" && match.home_score !== null && (
         <div className="alert-info">
           <div className="text-lg font-extrabold">
             Final · {match.home_score} – {match.away_score}
           </div>
-          {prediction && (
+          {effectivePrediction && (
             <p className="text-sm opacity-80 mt-1">
-              Your pick: {prediction.pred_home_score}–{prediction.pred_away_score}
-              {prediction.points > 0 && (
+              Your pick: {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
+              {isDefaultPick && (
+                <span className="opacity-70"> (default 0-0)</span>
+              )}
+              {prediction && prediction.points > 0 && (
                 <span className="font-bold text-mexico"> · +{prediction.points} pts 🎉</span>
               )}
             </p>
@@ -297,9 +343,9 @@ export function MatchCard({
       ) : lock.variant !== "final" ? (
         <div className="space-y-3">
           {error && <div className="alert-error">{error}</div>}
-          {!saved && (
-            <p className="text-center text-sm text-canada font-semibold">
-              🔒 Locked — no pick saved
+          {isDefaultPick && (
+            <p className="text-center text-sm text-ink-muted">
+              🔒 Locked — default pick 0–0
             </p>
           )}
         </div>
@@ -341,6 +387,8 @@ function MatchupRow({
   displayAway,
   onHomeChange,
   onAwayChange,
+  liveHomeScore,
+  liveAwayScore,
 }: {
   match: Match;
   pickable: boolean;
@@ -352,7 +400,12 @@ function MatchupRow({
   displayAway: number | null;
   onHomeChange: (v: number | null) => void;
   onAwayChange: (v: number | null) => void;
+  liveHomeScore?: number | null;
+  liveAwayScore?: number | null;
 }) {
+  const showingLive =
+    liveHomeScore != null && liveAwayScore != null && match.status === "live";
+
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 md:gap-3">
       <TeamSide
@@ -362,36 +415,46 @@ function MatchupRow({
       />
 
       <div className="flex items-center justify-center gap-1 md:gap-1.5 shrink-0">
-        {showScores && (
+        {showingLive ? (
           <>
-            {pickable ? (
-              <ScoreControl
-                value={homeScore}
-                onChange={onHomeChange}
-                compact
-                disabled={scoresLocked}
-              />
-            ) : (
-              <ScoreDisplay value={displayHome} compact />
-            )}
+            <LiveScoreDisplay value={liveHomeScore} />
+            <div className="shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-canada/10 flex items-center justify-center">
+              <span className="text-[9px] md:text-[10px] font-black text-canada">
+                –
+              </span>
+            </div>
+            <LiveScoreDisplay value={liveAwayScore} />
           </>
-        )}
-        <div className="shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-cream flex items-center justify-center">
-          <span className="text-[9px] md:text-[10px] font-black text-ink-faint">VS</span>
-        </div>
-        {showScores && (
-          <>
-            {pickable ? (
-              <ScoreControl
-                value={awayScore}
-                onChange={onAwayChange}
-                compact
-                disabled={scoresLocked}
-              />
-            ) : (
-              <ScoreDisplay value={displayAway} compact />
-            )}
-          </>
+        ) : (
+          showScores && (
+            <>
+              {pickable ? (
+                <ScoreControl
+                  value={homeScore}
+                  onChange={onHomeChange}
+                  compact
+                  disabled={scoresLocked}
+                />
+              ) : (
+                <ScoreDisplay value={displayHome} compact />
+              )}
+              <div className="shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full bg-cream flex items-center justify-center">
+                <span className="text-[9px] md:text-[10px] font-black text-ink-faint">
+                  VS
+                </span>
+              </div>
+              {pickable ? (
+                <ScoreControl
+                  value={awayScore}
+                  onChange={onAwayChange}
+                  compact
+                  disabled={scoresLocked}
+                />
+              ) : (
+                <ScoreDisplay value={displayAway} compact />
+              )}
+            </>
+          )
         )}
       </div>
 
@@ -401,6 +464,14 @@ function MatchupRow({
         align="right"
       />
     </div>
+  );
+}
+
+function LiveScoreDisplay({ value }: { value: number }) {
+  return (
+    <span className="text-2xl md:text-3xl font-extrabold text-canada tabular-nums min-w-[2ch] text-center">
+      {value}
+    </span>
   );
 }
 

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts",
+    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts",
     "seed": "tsx scripts/seed.ts",
     "migrate:pick-confirmed": "tsx scripts/migrate-pick-confirmed.ts"
   },

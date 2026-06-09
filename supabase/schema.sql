@@ -47,10 +47,11 @@ CREATE TABLE IF NOT EXISTS matches (
   away_team_id uuid REFERENCES teams(id),
   home_label text NOT NULL,
   away_label text NOT NULL,
-  status text DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'locked', 'final')),
+  status text DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'locked', 'live', 'final')),
   home_score int,
   away_score int,
   winner_team_id uuid REFERENCES teams(id),
+  live_updated_at timestamptz,
   decided_by_penalties boolean DEFAULT false,
   home_win_bonus int NOT NULL DEFAULT 0,
   draw_bonus int NOT NULL DEFAULT 0,
@@ -186,12 +187,12 @@ CREATE INDEX IF NOT EXISTS idx_predictions_match ON match_predictions(match_id);
 
 -- Seed Settings
 INSERT INTO settings (key, value) VALUES
-  ('buy_in', '40'),
+  ('buy_in', '50'),
   ('pool_locked', 'false'),
   ('big_predictions_locked', 'false'),
   ('finals_challenge_open', 'false'),
   ('tournament_complete', 'false'),
-  ('payout_percentages', '{"overall_first": 45, "overall_second": 20, "overall_third": 10, "exact_score": 10, "finals_challenge": 10, "fun_prize": 5}'),
+  ('payout_percentages', '{"overall_first": 55, "overall_second": 25, "overall_third": 15, "exact_score": 0, "finals_challenge": 0, "fun_prize": 0}'),
   ('exact_score_fire_bonus_enabled', 'true'),
   ('group_stage_match_point_cap', '18'),
   ('perfect_day_bonus_enabled', 'true'),

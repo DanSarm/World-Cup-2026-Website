@@ -1,4 +1,5 @@
 import { GROUP_LETTERS, type Match, type Team } from "./types";
+import { getActualMatchScore } from "./matchResults";
 
 export interface PickScore {
   home: number;
@@ -99,19 +100,14 @@ function teamFromMatch(
   return { id, team };
 }
 
-/** Effective score for standings: final results beat saved/draft picks. */
+/** Effective score for standings: real results beat saved/draft picks. */
 export function getEffectivePickScore(
   match: Match,
   saved?: PickScore | null,
   draft?: PickScore | null
 ): PickScore | null {
-  if (
-    match.status === "final" &&
-    match.home_score != null &&
-    match.away_score != null
-  ) {
-    return { home: match.home_score, away: match.away_score };
-  }
+  const actual = getActualMatchScore(match);
+  if (actual) return actual;
   if (draft) return draft;
   if (saved) return saved;
   return null;

@@ -1,4 +1,5 @@
-import type { MatchPrediction } from "./types";
+import type { Match, MatchPrediction } from "./types";
+import { isMatchLocked } from "./utils";
 
 /** True only when the player explicitly locked/saved this pick. */
 export function isConfirmedPick(prediction: MatchPrediction): boolean {
@@ -10,4 +11,40 @@ export function hasSavedPick(
 ): boolean {
   if (!prediction) return false;
   return isConfirmedPick(prediction);
+}
+
+export type EffectivePickScores = Pick<
+  MatchPrediction,
+  "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
+>;
+
+/** Saved pick, or 0-0 once the match has kicked off / finished. */
+export function getEffectiveMatchPrediction(
+  match: Pick<Match, "status" | "kickoff_at">,
+  prediction?: MatchPrediction | null
+): EffectivePickScores | null {
+  if (prediction && isConfirmedPick(prediction)) {
+    return {
+      pred_home_score: prediction.pred_home_score,
+      pred_away_score: prediction.pred_away_score,
+      pred_winner_team_id: prediction.pred_winner_team_id,
+    };
+  }
+
+  if (isMatchLocked(match)) {
+    return {
+      pred_home_score: 0,
+      pred_away_score: 0,
+      pred_winner_team_id: null,
+    };
+  }
+
+  return null;
+}
+
+export function usesDefaultMissingPick(
+  match: Pick<Match, "status" | "kickoff_at">,
+  prediction?: MatchPrediction | null
+): boolean {
+  return !hasSavedPick(prediction) && isMatchLocked(match);
 }

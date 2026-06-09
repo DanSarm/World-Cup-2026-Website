@@ -48,14 +48,14 @@ export function KnockoutBracketPanel({
     [matches, groupPickScores, predictions]
   );
 
-  const knockoutMatches = matches.filter((m) => m.match_number >= 73);
-  const knockoutPicks = predictions.filter(
-    (p) =>
-      hasSavedPick(p) &&
-      knockoutMatches.some((m) => m.id === p.match_id)
-  ).length;
-
   const getMatch = (n: number) => bracket.byNumber.get(n);
+  const dbMatchByNumber = useMemo(
+    () =>
+      new Map(
+        matches.filter((m) => m.match_number >= 73).map((m) => [m.match_number, m])
+      ),
+    [matches]
+  );
 
   return (
     <section className="w-full space-y-3">
@@ -66,8 +66,8 @@ export function KnockoutBracketPanel({
               Knockout bracket
             </h2>
             <p className="text-xs text-ink-muted leading-snug">
-              Round of 32 through the final, based on your group-stage picks
-              {knockoutPicks > 0 && " and knockout picks where saved"}
+              Real scores advance teams when games finish · your knockout picks
+              fill in games still to play
             </p>
           </div>
           <button
@@ -105,6 +105,7 @@ export function KnockoutBracketPanel({
                   { label: "Semi-finals", matchNumbers: [...BRACKET_TREE.left.sf], span: 8 },
                 ]}
                 getMatch={getMatch}
+                dbMatchByNumber={dbMatchByNumber}
               />
 
               <div className="bracket-center">
@@ -113,6 +114,7 @@ export function KnockoutBracketPanel({
                   {getMatch(BRACKET_TREE.center.final) && (
                     <BracketMatchCard
                       match={getMatch(BRACKET_TREE.center.final)!}
+                      dbMatch={dbMatchByNumber.get(BRACKET_TREE.center.final)}
                       featured
                     />
                   )}
@@ -123,6 +125,7 @@ export function KnockoutBracketPanel({
                       </span>
                       <BracketMatchCard
                         match={getMatch(BRACKET_TREE.center.third)!}
+                        dbMatch={dbMatchByNumber.get(BRACKET_TREE.center.third)}
                       />
                     </div>
                   )}
@@ -138,6 +141,7 @@ export function KnockoutBracketPanel({
                   { label: "Round of 32", matchNumbers: [...BRACKET_TREE.right.r32], span: 1 },
                 ]}
                 getMatch={getMatch}
+                dbMatchByNumber={dbMatchByNumber}
               />
             </div>
           </div>
@@ -157,10 +161,12 @@ function BracketHalf({
   side,
   rounds,
   getMatch,
+  dbMatchByNumber,
 }: {
   side: "left" | "right";
   rounds: BracketRoundCol[];
   getMatch: (n: number) => BracketMatchView | undefined;
+  dbMatchByNumber: Map<number, Match>;
 }) {
   return (
     <div
@@ -174,6 +180,7 @@ function BracketHalf({
           rowSpan={round.span}
           side={side}
           getMatch={getMatch}
+          dbMatchByNumber={dbMatchByNumber}
         />
       ))}
     </div>
@@ -186,12 +193,14 @@ function BracketRoundColumn({
   rowSpan,
   side,
   getMatch,
+  dbMatchByNumber,
 }: {
   label: string;
   matchNumbers: number[];
   rowSpan: number;
   side: "left" | "right";
   getMatch: (n: number) => BracketMatchView | undefined;
+  dbMatchByNumber: Map<number, Match>;
 }) {
   return (
     <div className={`bracket-round ${side === "right" ? "bracket-round--right" : ""}`}>
@@ -208,7 +217,10 @@ function BracketRoundColumn({
                 gridRow: `${index * rowSpan + 1} / span ${rowSpan}`,
               }}
             >
-              <BracketMatchCard match={match} />
+              <BracketMatchCard
+                match={match}
+                dbMatch={dbMatchByNumber.get(num)}
+              />
             </div>
           );
         })}
@@ -220,10 +232,15 @@ function BracketRoundColumn({
 function BracketMatchCard({
   match,
   featured,
+  dbMatch,
 }: {
   match: BracketMatchView;
   featured?: boolean;
+  dbMatch?: Match;
 }) {
+  const isLive = dbMatch?.status === "live";
+  const showActual = match.isActualResult;
+
   return (
     <div
       className={`bracket-match rounded-lg border overflow-hidden ${
@@ -236,9 +253,20 @@ function BracketMatchCard({
         <span className="text-[8px] font-bold text-ink-faint uppercase tracking-wide">
           M{match.matchNumber}
         </span>
-        {match.hasPick && (
-          <span className="text-[8px] font-semibold text-mexico">Pick</span>
-        )}
+        <div className="flex items-center gap-1">
+          {showActual && (
+            <span
+              className={`text-[8px] font-semibold uppercase ${
+                isLive ? "text-canada" : "text-mexico"
+              }`}
+            >
+              {isLive ? "Live" : "Final"}
+            </span>
+          )}
+          {!showActual && match.hasPick && (
+            <span className="text-[8px] font-semibold text-ink-faint">Pick</span>
+          )}
+        </div>
       </div>
       <BracketTeamRow
         slot={match.home}

@@ -180,6 +180,7 @@ const dayMatches: Match[] = [
   {
     ...groupMatch,
     id: "m1",
+    status: "final",
     kickoff_at: "2026-06-13T18:00:00Z",
     home_score: 2,
     away_score: 1,
@@ -187,6 +188,7 @@ const dayMatches: Match[] = [
   {
     ...groupMatch,
     id: "m2",
+    status: "final",
     kickoff_at: "2026-06-13T22:00:00Z",
     home_score: 1,
     away_score: 0,
@@ -201,6 +203,7 @@ const dayPreds: MatchPrediction[] = [
     pred_home_score: 2,
     pred_away_score: 1,
     pred_winner_team_id: null,
+    pick_confirmed: true,
     points: 0,
     exact_score: false,
     correct_result: false,
@@ -212,13 +215,14 @@ const dayPreds: MatchPrediction[] = [
     pred_home_score: 1,
     pred_away_score: 0,
     pred_winner_team_id: null,
+    pick_confirmed: true,
     points: 0,
     exact_score: false,
     correct_result: false,
   },
 ];
 
-const bonuses = calculatePerfectDayBonuses(dayMatches, dayPreds);
+const bonuses = calculatePerfectDayBonuses(dayMatches, dayPreds, ["player1"]);
 assert(
   bonuses.get("player1") === 5,
   "perfect day bonus +5"

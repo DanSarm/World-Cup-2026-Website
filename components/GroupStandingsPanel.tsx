@@ -9,6 +9,7 @@ import {
 } from "@/lib/groupStandings";
 import { GROUP_LETTERS, type Match, type MatchPrediction } from "@/lib/types";
 import { hasSavedPick } from "@/lib/pickUtils";
+import { hasActualMatchResult } from "@/lib/matchResults";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 
@@ -60,6 +61,9 @@ export function GroupStandingsPanel({
 
   const totalPicks = groups.reduce((s, g) => s + g.picksApplied, 0);
   const totalGroupMatches = groups.reduce((s, g) => s + g.totalMatches, 0);
+  const finalGroupResults = matches.filter(
+    (m) => m.stage === "group" && hasActualMatchResult(m)
+  ).length;
 
   if (!groups.length) return null;
 
@@ -71,7 +75,8 @@ export function GroupStandingsPanel({
             Your group picture
           </h2>
           <p className="text-xs text-ink-muted leading-snug">
-            Based on your saved group-stage picks
+            Final scores update standings automatically · unplayed games use your
+            picks
           </p>
         </div>
         <button
@@ -85,7 +90,10 @@ export function GroupStandingsPanel({
 
       <div className="flex items-center justify-between gap-2 text-xs">
         <span className="text-ink-muted tabular-nums">
-          {totalPicks}/{totalGroupMatches} group picks applied
+          {finalGroupResults > 0 && (
+            <span>{finalGroupResults} final · </span>
+          )}
+          {totalPicks}/{totalGroupMatches} picks applied
         </span>
         <div className="flex gap-1">
           {(

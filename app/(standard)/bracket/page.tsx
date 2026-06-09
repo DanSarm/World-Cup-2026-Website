@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getMatchesWithTeams, getPredictions } from "@/lib/data";
 import { BracketClient } from "@/components/BracketClient";
+import { isAnyMatchInPlayWindow } from "@/lib/matchLive";
 
 export default async function BracketPage() {
   const session = await getSession();
@@ -12,5 +13,11 @@ export default async function BracketPage() {
     getPredictions(session.id),
   ]);
 
-  return <BracketClient matches={matches} predictions={predictions} />;
+  return (
+    <BracketClient
+      matches={matches}
+      predictions={predictions}
+      pollLive={isAnyMatchInPlayWindow(matches)}
+    />
+  );
 }

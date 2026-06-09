@@ -12,6 +12,9 @@ import {
 } from "./scoring";
 import { buildProjectedPrizes } from "./payouts";
 import { isConfirmedPick } from "./pickUtils";
+import { resolvePlayerPodium } from "./podiumDisplay";
+import { buildRecentFormByPlayer } from "./recentPickForm";
+import { findLiveMatch, hasAnyLiveMatch } from "./matchLive";
 import type {
   ActualTournamentResults,
   BigPrediction,
@@ -20,7 +23,9 @@ import type {
   ManualAdjustment,
   Match,
   MatchPrediction,
+  PickFormSlot,
   Player,
+  PlayerPodiumDisplay,
   Team,
   TournamentPodiumPrediction,
 } from "./types";
@@ -68,6 +73,7 @@ function normalizeMatch(row: Match): Match {
     away_implied_probability: row.away_implied_probability ?? null,
     home_advance_probability: row.home_advance_probability ?? null,
     away_advance_probability: row.away_advance_probability ?? null,
+    live_updated_at: row.live_updated_at ?? null,
     odds_source_note: row.odds_source_note ?? row.odds_source ?? null,
   };
 }
@@ -101,6 +107,8 @@ export interface CommunityMatchPick {
   predHomeScore: number;
   predAwayScore: number;
   predWinnerTeamId: string | null;
+  podiumPicks?: PlayerPodiumDisplay | null;
+  recentForm?: PickFormSlot[];
 }
 
 export async function getConfirmedMatchPicks(
@@ -142,23 +150,49 @@ export async function getConfirmedMatchPicks(
   };
 
   const parsedRows = rows as Row[];
-
-  return parsedRows
+  const playerIds = parsedRows
     .filter((row) => row.pick_confirmed !== false)
-    .map((row) => {
-      const player = Array.isArray(row.players) ? row.players[0] : row.players;
-      if (!player) return null;
-      return {
-        playerId: row.player_id,
-        displayName: player.display_name,
-        avatarEmoji: player.avatar_emoji ?? "⚽",
-        predHomeScore: row.pred_home_score,
-        predAwayScore: row.pred_away_score,
-        predWinnerTeamId: row.pred_winner_team_id,
-      };
-    })
-    .filter((pick): pick is CommunityMatchPick => pick !== null)
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    .map((row) => row.player_id);
+
+  const [teams, podiumPredictions, matches, allPredictions, settings] =
+    await Promise.all([
+      getTeams(),
+      getTournamentPodiumPredictions(),
+      getMatchesWithTeams(),
+      getPredictions(),
+      getSettings(),
+    ]);
+  const podiumByPlayer = new Map(
+    podiumPredictions.map((p) => [p.player_id, p])
+  );
+  const scoringConfig = scoringConfigFromSettings(settings);
+  const recentFormByPlayer = buildRecentFormByPlayer(
+    playerIds,
+    matches,
+    allPredictions,
+    scoringConfig
+  );
+
+  const picks: CommunityMatchPick[] = [];
+  for (const row of parsedRows.filter((r) => r.pick_confirmed !== false)) {
+    const player = Array.isArray(row.players) ? row.players[0] : row.players;
+    if (!player) continue;
+    picks.push({
+      playerId: row.player_id,
+      displayName: player.display_name,
+      avatarEmoji: player.avatar_emoji ?? "⚽",
+      predHomeScore: row.pred_home_score,
+      predAwayScore: row.pred_away_score,
+      predWinnerTeamId: row.pred_winner_team_id,
+      podiumPicks: resolvePlayerPodium(
+        podiumByPlayer.get(row.player_id),
+        teams
+      ),
+      recentForm: recentFormByPlayer.get(row.player_id),
+    });
+  }
+
+  return picks.sort((a, b) => a.displayName.localeCompare(b.displayName));
 }
 
 export async function getTournamentPodiumPredictions(): Promise<
@@ -243,14 +277,19 @@ export async function getActualResults(): Promise<ActualTournamentResults> {
   return results;
 }
 
-export async function getLeaderboardData(): Promise<{
+export async function getLeaderboardData(options?: {
+  includeLiveScores?: boolean;
+}): Promise<{
   leaderboard: LeaderboardEntry[];
   finalsLeaderboard: ReturnType<typeof getFinalsChallengeLeaderboard>;
   settings: Awaited<ReturnType<typeof getSettings>>;
   players: Player[];
   matches: Match[];
+  liveMatch: Match | null;
+  hasLiveScoring: boolean;
 }> {
-  const [players, matches, predictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings] =
+  const includeLiveScores = options?.includeLiveScores ?? false;
+  const [players, matches, predictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
     await Promise.all([
       getPlayers(),
       getMatchesWithTeams(),
@@ -260,12 +299,43 @@ export async function getLeaderboardData(): Promise<{
       getAdjustments(),
       getActualResults(),
       getSettings(),
+      getTeams(),
     ]);
+
+  const { ensureDefaultPredictionsForLockedMatches } = await import(
+    "./defaultPredictions"
+  );
+  await ensureDefaultPredictionsForLockedMatches(
+    matches,
+    players,
+    predictions
+  );
+  const scoredPredictions = await getPredictions();
+
+  const podiumByPlayer = new Map(
+    podiumPredictions.map((p) => [p.player_id, p])
+  );
+  const scoringConfig = scoringConfigFromSettings(settings);
+  const recentFormByPlayer = buildRecentFormByPlayer(
+    players.map((p) => p.id),
+    matches,
+    scoredPredictions,
+    scoringConfig
+  );
+  const attachPlayerExtras = (entries: LeaderboardEntry[]) =>
+    entries.map((entry) => ({
+      ...entry,
+      podiumPicks: resolvePlayerPodium(
+        podiumByPlayer.get(entry.playerId),
+        teams
+      ),
+      recentForm: recentFormByPlayer.get(entry.playerId),
+    }));
 
   const tempLb = calculateLeaderboard(
     players,
     matches,
-    predictions,
+    scoredPredictions,
     podiumPredictions,
     finalsPredictions,
     adjustments,
@@ -282,16 +352,19 @@ export async function getLeaderboardData(): Promise<{
     settings
   );
 
-  const leaderboard = calculateLeaderboard(
-    players,
-    matches,
-    predictions,
-    podiumPredictions,
-    finalsPredictions,
-    adjustments,
-    settings,
-    actualResults,
-    projectedPrizes
+  const leaderboard = attachPlayerExtras(
+    calculateLeaderboard(
+      players,
+      matches,
+      scoredPredictions,
+      podiumPredictions,
+      finalsPredictions,
+      adjustments,
+      settings,
+      actualResults,
+      projectedPrizes,
+      { includeLiveScores }
+    )
   );
 
   const finalsLeaderboard = getFinalsChallengeLeaderboard(
@@ -300,12 +373,29 @@ export async function getLeaderboardData(): Promise<{
     actualResults
   );
 
-  return { leaderboard, finalsLeaderboard, settings, players, matches };
+  const liveMatch = findLiveMatch(matches);
+
+  return {
+    leaderboard,
+    finalsLeaderboard,
+    settings,
+    players,
+    matches,
+    liveMatch,
+    hasLiveScoring: hasAnyLiveMatch(matches),
+  };
+}
+
+export async function getLiveSnapshot() {
+  const { syncLiveScores } = await import("./scores/sync");
+  const sync = await syncLiveScores();
+  const snapshot = await getLeaderboardData({ includeLiveScores: true });
+  return { sync, ...snapshot };
 }
 
 export async function recalculateAllScores(): Promise<void> {
   const supabase = getSupabase();
-  const [matches, predictions, podiumPredictions, finalsPredictions, actualResults, settings] =
+  const [matches, predictions, podiumPredictions, finalsPredictions, actualResults, settings, players] =
     await Promise.all([
       getMatchesWithTeams(),
       getPredictions(),
@@ -313,15 +403,27 @@ export async function recalculateAllScores(): Promise<void> {
       getFinalsPredictions(),
       getActualResults(),
       getSettings(),
+      getPlayers(),
     ]);
+
+  const { ensureDefaultPredictionsForLockedMatches } = await import(
+    "./defaultPredictions"
+  );
+  await ensureDefaultPredictionsForLockedMatches(
+    matches,
+    players,
+    predictions
+  );
+
+  const refreshedPredictions = await getPredictions();
 
   const { scoringConfigFromSettings } = await import("./scoring");
   const scoringConfig = scoringConfigFromSettings(settings);
 
-  for (const pred of predictions) {
+  for (const pred of refreshedPredictions) {
     if (!isConfirmedPick(pred)) continue;
     const match = matches.find((m) => m.id === pred.match_id);
-    if (!match) continue;
+    if (!match || match.status !== "final") continue;
     const result = scoreMatchPrediction(match, pred, scoringConfig);
     await supabase
       .from("match_predictions")

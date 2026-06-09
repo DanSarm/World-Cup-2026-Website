@@ -1,31 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LeaderboardTable } from "./LeaderboardTable";
 import { StatCards } from "./StatCards";
 import { PageHeader } from "./PageHeader";
 import type { LeaderboardEntry } from "@/lib/types";
+import {
+  filterLeaderboard,
+  type LeaderboardFilter,
+} from "@/lib/leaderboardFilter";
+import { mergeLeaderboard, useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 
 interface LeaderboardClientProps {
   leaderboard: LeaderboardEntry[];
+  prizePool: number;
   funStats: {
     mostPoints: { name: string; points: number } | null;
     mostExactScores: { name: string; count: number } | null;
     mostMiraclePoints: { name: string; points: number } | null;
     bestPerfectDay: { name: string; count: number } | null;
   };
+  pollLive?: boolean;
 }
 
-type Mode = "points" | "exact";
-
 export function LeaderboardClient({
-  leaderboard,
+  leaderboard: initialLeaderboard,
+  prizePool,
   funStats,
+  pollLive = false,
 }: LeaderboardClientProps) {
-  const [mode, setMode] = useState<Mode>("points");
+  const [filter, setFilter] = useState<LeaderboardFilter>("paid");
+  const { data } = useLiveRefresh(pollLive);
 
-  const sortedExact = [...leaderboard].sort(
-    (a, b) => b.exactScores - a.exactScores || b.totalPoints - a.totalPoints
+  const hasLiveScoring = data?.hasLiveScoring ?? false;
+  const leaderboard = useMemo(
+    () => mergeLeaderboard(initialLeaderboard, data?.leaderboard),
+    [initialLeaderboard, data?.leaderboard]
+  );
+
+  const displayedLeaderboard = useMemo(
+    () => filterLeaderboard(leaderboard, filter, prizePool),
+    [leaderboard, filter, prizePool]
   );
 
   return (
@@ -33,17 +48,20 @@ export function LeaderboardClient({
       <PageHeader
         flags={["ARG", "FRA", "BRA", "GER"]}
         title="Leaderboard"
-        subtitle="Live standings from saved picks"
+        subtitle={
+          hasLiveScoring
+            ? "Live standings — points update with the current score"
+            : filter === "paid"
+              ? "Rankings among players in the prize pool"
+              : "Standings from saved picks"
+        }
       />
 
       <LeaderboardTable
-        entries={
-          mode === "exact"
-            ? sortedExact.map((e, i) => ({ ...e, rank: i + 1 }))
-            : leaderboard
-        }
-        mode={mode}
-        onModeChange={setMode}
+        entries={displayedLeaderboard}
+        filter={filter}
+        onFilterChange={setFilter}
+        hasLiveScoring={hasLiveScoring}
       />
 
       <StatCards {...funStats} />

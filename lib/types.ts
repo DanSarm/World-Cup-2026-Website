@@ -16,7 +16,7 @@ export type MatchStage =
   | "third_place"
   | "final";
 
-export type MatchStatus = "scheduled" | "locked" | "final";
+export type MatchStatus = "scheduled" | "locked" | "live" | "final";
 
 export type OddsStatus =
   | "not_synced"
@@ -88,6 +88,7 @@ export interface Match {
   home_score: number | null;
   away_score: number | null;
   winner_team_id: string | null;
+  live_updated_at?: string | null;
   decided_by_penalties: boolean;
   home_win_bonus: number;
   draw_bonus: number;
@@ -139,6 +140,17 @@ export interface TournamentPodiumPrediction {
   points: number;
   submitted_at?: string;
   updated_at?: string;
+}
+
+export type PodiumTeamRef = Pick<Team, "fifa_code" | "short_name" | "name">;
+
+export type PickFormResult = "exact" | "correct" | "wrong";
+export type PickFormSlot = PickFormResult | null;
+
+export interface PlayerPodiumDisplay {
+  first: PodiumTeamRef | null;
+  second: PodiumTeamRef | null;
+  third: PodiumTeamRef | null;
 }
 
 export interface BigPrediction {
@@ -244,6 +256,12 @@ export interface LeaderboardEntry {
   projectedPrize: number;
   prizeLabel: "Projected" | "Won";
   closestFinalScoreDiff: number | null;
+  podiumPicks?: PlayerPodiumDisplay | null;
+  recentForm?: PickFormSlot[];
+  /** Total points if live matches score at current live score */
+  provisionalTotalPoints?: number;
+  /** Extra points from live match(es) not yet final */
+  livePoints?: number;
 }
 
 export interface SessionPlayer {

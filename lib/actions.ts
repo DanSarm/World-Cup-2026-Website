@@ -20,6 +20,7 @@ import {
 } from "./validation";
 import { isMatchLocked } from "./utils";
 import { recalculateAllScores } from "./data";
+import { POOL_ENTRY_FEE } from "./payouts";
 import type { Match } from "./types";
 
 export async function registerAction(formData: FormData) {
@@ -219,11 +220,10 @@ export async function saveTournamentPodiumAction(formData: FormData) {
 export async function adminTogglePaidAction(playerId: string, paid: boolean) {
   const admin = await requireAdmin();
   const supabase = getSupabase();
-  const settings = await getSettings();
 
   await supabase
     .from("players")
-    .update({ paid, paid_amount: paid ? settings.buy_in : 0 })
+    .update({ paid, paid_amount: paid ? POOL_ENTRY_FEE : 0 })
     .eq("id", playerId);
 
   await logAudit(admin.id, "toggle_paid", { playerId, paid });

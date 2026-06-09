@@ -7,6 +7,7 @@ import {
 import { THIRD_PLACE_COMBINATIONS, type WinnerSlot } from "./thirdPlaceCombinations";
 import { GROUP_LETTERS, type Match, type MatchPrediction, type Team } from "./types";
 import { hasSavedPick } from "./pickUtils";
+import { getActualMatchScore } from "./matchResults";
 
 export interface BracketTeam {
   teamId: string;
@@ -26,6 +27,8 @@ export interface BracketMatchView {
   away: BracketSlot;
   winnerId: string | null;
   hasPick: boolean;
+  /** True when the winner comes from a real final/live score. */
+  isActualResult: boolean;
 }
 
 export interface KnockoutBracketView {
@@ -272,29 +275,36 @@ function resolveMatchWinner(
   home: BracketTeam | null,
   away: BracketTeam | null,
   pick: KnockoutPick | undefined
-): BracketTeam | null {
-  if (!home || !away) return null;
+): { winner: BracketTeam | null; fromActual: boolean } {
+  if (!home || !away) return { winner: null, fromActual: false };
 
-  if (
-    match?.status === "final" &&
-    match.home_score != null &&
-    match.away_score != null
-  ) {
-    if (match.winner_team_id) {
-      return match.winner_team_id === home.teamId ? home : away;
+  const actual = match ? getActualMatchScore(match) : null;
+  if (actual) {
+    if (match?.winner_team_id) {
+      const winner =
+        match.winner_team_id === home.teamId
+          ? home
+          : match.winner_team_id === away.teamId
+            ? away
+            : null;
+      return { winner, fromActual: !!winner };
     }
-    if (match.home_score > match.away_score) return home;
-    if (match.away_score > match.home_score) return away;
-    return null;
+    if (actual.home > actual.away) return { winner: home, fromActual: true };
+    if (actual.away > actual.home) return { winner: away, fromActual: true };
+    return { winner: null, fromActual: true };
   }
 
-  if (!pick) return null;
+  if (!pick) return { winner: null, fromActual: false };
 
-  if (pick.home > pick.away) return home;
-  if (pick.away > pick.home) return away;
-  if (pick.pred_winner_team_id === home.teamId) return home;
-  if (pick.pred_winner_team_id === away.teamId) return away;
-  return null;
+  if (pick.home > pick.away) return { winner: home, fromActual: false };
+  if (pick.away > pick.home) return { winner: away, fromActual: false };
+  if (pick.pred_winner_team_id === home.teamId) {
+    return { winner: home, fromActual: false };
+  }
+  if (pick.pred_winner_team_id === away.teamId) {
+    return { winner: away, fromActual: false };
+  }
+  return { winner: null, fromActual: false };
 }
 
 export function buildKnockoutBracket(
@@ -357,7 +367,12 @@ export function buildKnockoutBracket(
 
     const homeTeam = homeSlot.team;
     const awayTeam = awaySlot.team;
-    const winner = resolveMatchWinner(dbMatch, homeTeam, awayTeam, knockoutPick);
+    const { winner, fromActual } = resolveMatchWinner(
+      dbMatch,
+      homeTeam,
+      awayTeam,
+      knockoutPick
+    );
 
     const view: BracketMatchView = {
       matchNumber,
@@ -366,6 +381,7 @@ export function buildKnockoutBracket(
       away: awaySlot,
       winnerId: winner?.teamId ?? null,
       hasPick: !!knockoutPick,
+      isActualResult: fromActual,
     };
 
     views.push(view);

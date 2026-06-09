@@ -14,8 +14,11 @@ export function formatDateHeader(kickoffAt: string | null): string {
   return formatInTimeZone(parseISO(kickoffAt), TZ, "EEEE, MMM d");
 }
 
-export function isMatchLocked(match: Match): boolean {
+export function isMatchLocked(
+  match: Pick<Match, "status" | "kickoff_at">
+): boolean {
   if (match.status === "final") return true;
+  if (match.status === "live") return true;
   if (match.status === "locked") return true;
   if (!match.kickoff_at) return false;
   return isBefore(parseISO(match.kickoff_at), new Date());
@@ -23,10 +26,13 @@ export function isMatchLocked(match: Match): boolean {
 
 export function getLockStatus(match: Match): {
   label: string;
-  variant: "open" | "soon" | "locked" | "final";
+  variant: "open" | "soon" | "locked" | "live" | "final";
 } {
   if (match.status === "final") {
     return { label: "Final", variant: "final" };
+  }
+  if (match.status === "live") {
+    return { label: "Live", variant: "live" };
   }
   if (isMatchLocked(match)) {
     return { label: "Locked", variant: "locked" };

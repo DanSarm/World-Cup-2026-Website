@@ -12,7 +12,7 @@ import type {
   TournamentPodiumPrediction,
 } from "./types";
 import { isKnockoutStage } from "./types";
-import { isConfirmedPick } from "./pickUtils";
+import { isConfirmedPick, getEffectiveMatchPrediction } from "./pickUtils";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
   capGroupMatchPoints,
@@ -113,7 +113,8 @@ export function scoreMatchPrediction(
     MatchPrediction,
     "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
   >,
-  scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
+  scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG,
+  options?: { allowLive?: boolean }
 ): ScoreMatchResult {
   const emptyBreakdown: ScoreBreakdown = {
     basePoints: 0,
@@ -135,8 +136,12 @@ export function scoreMatchPrediction(
     breakdown: emptyBreakdown,
   };
 
+  const allowLive = options?.allowLive === true;
+  const scoreable =
+    match.status === "final" || (allowLive && match.status === "live");
+
   if (
-    match.status !== "final" ||
+    !scoreable ||
     match.home_score === null ||
     match.away_score === null
   ) {
@@ -275,6 +280,7 @@ export function scoreMatchPrediction(
 export function calculatePerfectDayBonuses(
   matches: Match[],
   predictions: MatchPrediction[],
+  playerIds: string[],
   scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
 ): Map<string, number> {
   const bonuses = new Map<string, number>();
@@ -292,10 +298,10 @@ export function calculatePerfectDayBonuses(
 
   const predByPlayerMatch = new Map<string, MatchPrediction>();
   for (const p of predictions) {
-    predByPlayerMatch.set(`${p.player_id}:${p.match_id}`, p);
+    if (isConfirmedPick(p)) {
+      predByPlayerMatch.set(`${p.player_id}:${p.match_id}`, p);
+    }
   }
-
-  const playerIds = new Set(predictions.map((p) => p.player_id));
 
   for (const playerId of playerIds) {
     for (const [, dayMatches] of byDate) {
@@ -306,11 +312,12 @@ export function calculatePerfectDayBonuses(
 
       for (const m of dayMatches) {
         const pred = predByPlayerMatch.get(`${playerId}:${m.id}`);
-        if (!pred) {
+        const effective = getEffectiveMatchPrediction(m, pred);
+        if (!effective) {
           allPicked = false;
           break;
         }
-        const result = scoreMatchPrediction(m, pred, scoringConfig);
+        const result = scoreMatchPrediction(m, effective, scoringConfig);
         if (!result.correctResult) {
           allCorrect = false;
           break;
@@ -485,14 +492,17 @@ export function calculateLeaderboard(
   adjustments: ManualAdjustment[],
   settings: Settings,
   actualResults: ActualTournamentResults,
-  projectedPrizes: Map<string, number>
+  projectedPrizes: Map<string, number>,
+  options?: { includeLiveScores?: boolean }
 ): LeaderboardEntry[] {
+  const includeLiveScores = options?.includeLiveScores ?? false;
   const finalMatch = matches.find((m) => m.stage === "final");
   const scoringConfig = scoringConfigFromSettings(settings);
   const confirmedPredictions = predictions.filter(isConfirmedPick);
   const perfectDayBonuses = calculatePerfectDayBonuses(
     matches,
     confirmedPredictions,
+    players.map((p) => p.id),
     scoringConfig
   );
 
@@ -514,6 +524,7 @@ export function calculateLeaderboard(
     const playerPreds = confirmedPredictions.filter(
       (p) => p.player_id === player.id
     );
+    const predByMatchId = new Map(playerPreds.map((p) => [p.match_id, p]));
     let matchPoints = 0;
     let groupStagePoints = 0;
     let knockoutPoints = 0;
@@ -523,21 +534,32 @@ export function calculateLeaderboard(
     let correctResults = 0;
     let knockoutCorrect = 0;
 
-    for (const pred of playerPreds) {
-      const match = matches.find((m) => m.id === pred.match_id);
-      if (!match) continue;
-      const result = scoreMatchPrediction(match, pred, scoringConfig);
-      matchPoints += result.points;
-      if (match.stage === "group") {
-        groupStagePoints += result.points;
-      } else if (isKnockoutStage(match.stage)) {
-        knockoutPoints += result.points;
+    let livePoints = 0;
+
+    for (const match of matches) {
+      const pred = predByMatchId.get(match.id);
+      const effective = getEffectiveMatchPrediction(match, pred);
+      if (!effective) continue;
+
+      if (match.status === "final") {
+        const result = scoreMatchPrediction(match, effective, scoringConfig);
+        matchPoints += result.points;
+        if (match.stage === "group") {
+          groupStagePoints += result.points;
+        } else if (isKnockoutStage(match.stage)) {
+          knockoutPoints += result.points;
+        }
+        hardPickBonusPoints += result.outcomeBonus;
+        fireBonusPoints += result.fireBonus;
+        if (result.exactScore) exactScores++;
+        if (result.correctResult) correctResults++;
+        if (result.knockoutCorrect) knockoutCorrect++;
+      } else if (includeLiveScores && match.status === "live") {
+        const result = scoreMatchPrediction(match, effective, scoringConfig, {
+          allowLive: true,
+        });
+        livePoints += result.points;
       }
-      hardPickBonusPoints += result.outcomeBonus;
-      fireBonusPoints += result.fireBonus;
-      if (result.exactScore) exactScores++;
-      if (result.correctResult) correctResults++;
-      if (result.knockoutCorrect) knockoutCorrect++;
     }
 
     const podiumPred = podiumByPlayer.get(player.id);
@@ -559,11 +581,13 @@ export function calculateLeaderboard(
 
     const totalPoints =
       matchPoints + beforeCupPoints + perfectDayBonus + manualAdjustments;
+    const provisionalTotalPoints = totalPoints + livePoints;
 
     let closestFinalScoreDiff: number | null = null;
     if (finalMatch?.status === "final" && finalMatch.home_score !== null) {
-      const finalPred = playerPreds.find(
-        (p) => p.match_id === finalMatch.id
+      const finalPred = getEffectiveMatchPrediction(
+        finalMatch,
+        predByMatchId.get(finalMatch.id)
       );
       if (finalPred) {
         closestFinalScoreDiff =
@@ -591,18 +615,30 @@ export function calculateLeaderboard(
       exactScores,
       correctResults,
       knockoutCorrect,
-      picksMade: playerPreds.length,
+      picksMade: matches.filter((m) =>
+        getEffectiveMatchPrediction(m, predByMatchId.get(m.id))
+      ).length,
       beforeCupPoints,
       finalsChallengePoints,
       rank: 0,
       projectedPrize: projectedPrizes.get(player.id) ?? 0,
       prizeLabel: settings.tournament_complete ? "Won" : "Projected",
       closestFinalScoreDiff,
+      livePoints: includeLiveScores ? livePoints : undefined,
+      provisionalTotalPoints:
+        includeLiveScores && livePoints > 0 ? provisionalTotalPoints : undefined,
     };
   });
 
+  const sortPoints = (entry: LeaderboardEntry) =>
+    includeLiveScores && entry.provisionalTotalPoints != null
+      ? entry.provisionalTotalPoints
+      : entry.totalPoints;
+
   entries.sort((a, b) => {
-    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    const aPts = sortPoints(a);
+    const bPts = sortPoints(b);
+    if (bPts !== aPts) return bPts - aPts;
     return compareTieBreakers(a, b);
   });
 

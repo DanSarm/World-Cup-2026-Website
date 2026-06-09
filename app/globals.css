@@ -422,12 +422,117 @@ body {
   @apply flex items-center gap-3 px-4 py-3.5 sm:px-5 sm:py-4;
 }
 
+.lb-entry--first {
+  @apply gap-4 py-6 sm:py-7 sm:px-6;
+}
+
+.lb-entry--second {
+  @apply gap-4 py-5 sm:py-6 sm:px-5;
+}
+
+.lb-entry--third {
+  @apply gap-3.5 py-4.5 sm:py-5;
+}
+
+.lb-podium-block {
+  @apply mx-2 sm:mx-3 my-3 rounded-xl border border-ink/10 overflow-hidden;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.04);
+}
+
+.lb-podium-block .lb-entry--first {
+  @apply border-b border-ink/[0.06];
+}
+
+.lb-podium-block .lb-entry--second {
+  @apply border-b border-ink/[0.06];
+}
+
+.lb-entry--below-podium {
+  @apply border-t-2 border-ink/10;
+}
+
 .lb-entry-rank {
   @apply w-8 shrink-0 text-center font-bold tabular-nums text-ink-muted text-sm;
 }
 
 .lb-entry-rank--medal {
   @apply text-base;
+}
+
+.lb-entry--first .lb-entry-rank {
+  @apply w-11 text-[2.25rem] leading-none;
+}
+
+.lb-entry--second .lb-entry-rank {
+  @apply w-10 text-2xl leading-none;
+}
+
+.lb-entry--third .lb-entry-rank {
+  @apply w-9 text-xl leading-none;
+}
+
+.lb-entry-name {
+  @apply font-semibold text-ink truncate leading-tight;
+}
+
+.lb-entry--first .lb-entry-name {
+  @apply text-lg font-extrabold tracking-tight;
+}
+
+.lb-entry--first .lb-entry-name .inline-flex {
+  @apply text-xl;
+}
+
+.lb-entry--second .lb-entry-name {
+  @apply text-base font-bold;
+}
+
+.lb-entry--third .lb-entry-name {
+  @apply text-[15px] font-bold;
+}
+
+.lb-entry-meta {
+  @apply text-[11px] text-ink-faint mt-0.5 tabular-nums;
+}
+
+.lb-entry--first .lb-entry-meta {
+  @apply text-xs mt-1.5;
+}
+
+.lb-entry--second .lb-entry-meta {
+  @apply text-[11px] sm:text-xs mt-1;
+}
+
+.lb-entry--third .lb-entry-meta {
+  @apply mt-0.5;
+}
+
+.lb-entry-score-value {
+  @apply font-extrabold text-usa tabular-nums text-xl leading-none;
+}
+
+.lb-entry--first .lb-entry-score-value {
+  @apply text-4xl font-black tracking-tight;
+}
+
+.lb-entry--second .lb-entry-score-value {
+  @apply text-3xl font-black;
+}
+
+.lb-entry--third .lb-entry-score-value {
+  @apply text-2xl font-extrabold;
+}
+
+.lb-entry--first .lb-entry-score {
+  @apply min-w-[6rem];
+}
+
+.lb-entry--second .lb-entry-score {
+  @apply min-w-[5.5rem];
+}
+
+.lb-entry--third .lb-entry-score {
+  @apply min-w-[5rem];
 }
 
 .lb-entry-main {
@@ -570,17 +675,121 @@ body {
   }
 }
 
-.knockout-bracket-scroll {
+.knockout-bracket-scroll,
+.podium-odds-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgb(0 40 104 / 0.25) transparent;
   -webkit-overflow-scrolling: touch;
 }
 
-.knockout-bracket-scroll::-webkit-scrollbar {
+.home-podium-pair {
+  height: min(50vh, 360px);
+}
+
+@media (min-width: 1280px) {
+  .home-podium-pair {
+    height: 400px;
+  }
+}
+
+.home-podium-picks {
+  @apply divide-y divide-ink/[0.06];
+}
+
+.home-podium-place {
+  @apply flex items-center gap-3 px-4 sm:px-5;
+}
+
+.home-podium-place--first {
+  @apply py-4 sm:py-5 bg-usa/[0.04];
+  flex: 3 1 0%;
+}
+
+.home-podium-place--second {
+  @apply py-3 sm:py-4 bg-cream/40;
+  flex: 2.25 1 0%;
+}
+
+.home-podium-place--third {
+  @apply py-2.5 sm:py-3;
+  flex: 1.75 1 0%;
+}
+
+.home-podium-place--compact.home-podium-place--first {
+  @apply py-4;
+  flex: none;
+}
+
+.home-podium-place--compact.home-podium-place--second {
+  @apply py-3;
+  flex: none;
+}
+
+.home-podium-place--compact.home-podium-place--third {
+  @apply py-2.5;
+  flex: none;
+}
+
+.home-podium-place-medal {
+  @apply text-center shrink-0 leading-none;
+  width: 2.25rem;
+}
+
+.home-podium-place-medal--first {
+  @apply text-3xl sm:text-4xl;
+}
+
+.home-podium-place-medal--second {
+  @apply text-2xl sm:text-3xl;
+}
+
+.home-podium-place-medal--third {
+  @apply text-xl sm:text-2xl;
+}
+
+.home-podium-place-code--first {
+  @apply text-lg sm:text-xl font-extrabold text-ink tracking-tight;
+}
+
+.home-podium-place-code--second {
+  @apply text-base sm:text-lg font-bold text-ink;
+}
+
+.home-podium-place-code--third {
+  @apply text-sm sm:text-base font-semibold text-ink-muted;
+}
+
+.home-podium-place-label--first {
+  @apply text-[11px] font-bold uppercase tracking-wider text-usa mt-0.5;
+}
+
+.home-podium-place-label--second {
+  @apply text-[11px] font-semibold uppercase tracking-wide text-ink-muted mt-0.5;
+}
+
+.home-podium-place-label--third {
+  @apply text-[10px] font-medium uppercase tracking-wide text-ink-faint mt-0.5;
+}
+
+.home-podium-points--first {
+  @apply text-xs font-bold text-mexico;
+}
+
+.home-podium-points--second {
+  @apply text-[11px] font-semibold text-ink-muted;
+}
+
+.home-podium-points--third {
+  @apply text-[10px] font-medium text-ink-faint;
+}
+
+.knockout-bracket-scroll::-webkit-scrollbar,
+.podium-odds-scroll::-webkit-scrollbar {
   height: 6px;
 }
 
-.knockout-bracket-scroll::-webkit-scrollbar-thumb {
+.knockout-bracket-scroll::-webkit-scrollbar-thumb,
+.podium-odds-scroll::-webkit-scrollbar-thumb {
   background: rgb(0 40 104 / 0.25);
   border-radius: 999px;
 }

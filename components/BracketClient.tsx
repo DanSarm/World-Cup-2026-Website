@@ -1,16 +1,31 @@
 "use client";
 
+import { useMemo } from "react";
 import { PageHeader } from "./PageHeader";
 import { GroupStandingsPanel } from "./GroupStandingsPanel";
 import { KnockoutBracketPanel } from "./KnockoutBracketPanel";
+import { mergeMatchScoreUpdates } from "@/lib/matchLive";
+import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import type { Match, MatchPrediction } from "@/lib/types";
 
 interface BracketClientProps {
   matches: Match[];
   predictions: MatchPrediction[];
+  pollLive?: boolean;
 }
 
-export function BracketClient({ matches, predictions }: BracketClientProps) {
+export function BracketClient({
+  matches: initialMatches,
+  predictions,
+  pollLive = false,
+}: BracketClientProps) {
+  const { data } = useLiveRefresh(pollLive);
+
+  const matches = useMemo(
+    () => mergeMatchScoreUpdates(initialMatches, data?.matches ?? []),
+    [initialMatches, data?.matches]
+  );
+
   const hasGroupStage = matches.some((m) => m.stage === "group");
 
   return (
@@ -18,7 +33,7 @@ export function BracketClient({ matches, predictions }: BracketClientProps) {
       <PageHeader
         flags={["USA", "MEX", "CAN", "BRA"]}
         title="Bracket"
-        subtitle="Your projected group standings from saved picks"
+        subtitle="Real results where games have finished · your picks fill in the rest"
       />
 
       {hasGroupStage ? (

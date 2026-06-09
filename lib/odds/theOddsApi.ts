@@ -112,6 +112,31 @@ export async function fetchUpcomingOdds(): Promise<OddsApiEvent[]> {
   return (await res.json()) as OddsApiEvent[];
 }
 
+/** Outright World Cup winner odds (futures). */
+export async function fetchWorldCupWinnerOdds(): Promise<OddsApiEvent[]> {
+  const config = getOddsConfig();
+  if (!config.apiKey) {
+    throw new Error("ODDS_API_KEY is not configured");
+  }
+
+  const params = new URLSearchParams({
+    apiKey: config.apiKey,
+    regions: config.winnerRegions,
+    markets: "outrights",
+    oddsFormat: config.oddsFormat,
+  });
+
+  const url = `https://api.the-odds-api.com/v4/sports/${config.winnerSportKey}/odds/?${params}`;
+  const res = await fetch(url, { next: { revalidate: 3600 } });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Odds API winner error ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  return (await res.json()) as OddsApiEvent[];
+}
+
 function hoursDiff(a: string, b: string): number {
   return Math.abs(new Date(a).getTime() - new Date(b).getTime()) / 3600000;
 }

@@ -37,9 +37,11 @@ Fill in `.env.local`:
 | `FAMILY_ACCESS_CODE` | Code new players enter to join |
 | `ADMIN_INVITE_CODE` | Code that grants admin access |
 | `ODDS_API_KEY` | The Odds API key (optional; for auto bonus points) |
-| `ODDS_REGIONS` | Comma-separated regions, e.g. `us,uk,eu` |
-| `ODDS_LOCK_HOURS_BEFORE_KICKOFF` | Hours before kickoff to lock bonuses (default: 1) |
-| `CRON_SECRET` | Protects `/api/cron/sync-odds` when using Vercel cron |
+| `ODDS_REGIONS` | Comma-separated regions — use `us` only on free tier (1 credit per call) |
+| `ODDS_WINNER_REGIONS` | Regions for champion odds (default: `us`) |
+| `LIVE_SCORES_MAX_SYNCS_PER_DAY` | Cap on scores API calls per day (default: 8) |
+| `LIVE_SCORES_MIN_INTERVAL_MS` | Min ms between score syncs (default: 600000 = 10 min) |
+| `CRON_SECRET` | Protects optional cron routes (not required for live scores) |
 
 ### 4. Seed match fixtures
 
@@ -73,7 +75,22 @@ This app is **not** a gambling app — odds are used only to calculate simple bo
 4. In **Admin → Matches**, click **Sync odds for all upcoming matches**, or open a match’s **Odds & Bonuses** panel to sync one fixture.
 5. Users will see simple bonus pills like “Draw +3” or “Uzbekistan +5” — not decimal or American odds.
 
-Optional: set `CRON_SECRET` and schedule `POST /api/cron/sync-odds` (e.g. every 6 hours pre-tournament, hourly on match days).
+Optional: set `CRON_SECRET` and schedule `POST /api/cron/sync-odds` manually before match days (do **not** run every minute — each call costs credits).
+
+#### Free tier API budget (500 credits/month)
+
+The app is configured to stay within The Odds API **free tier** for the full World Cup:
+
+| Usage | Cost | When |
+|---|---|---|
+| Match odds sync (admin) | 1 credit per call with `ODDS_REGIONS=us` | Manual, before match days |
+| Live scores | 1 credit per sync | Only during in-play windows, max 8/day, 10 min apart |
+| Final scores | +1 extra credit once/day | First sync of the day picks up completed games |
+| Champion odds panel | 1 credit per day max | Cached 24 hours |
+
+Live scores **do not** run on a Vercel cron. Pages poll only while a match may be live; the server enforces throttling and a daily cap. If the API reports low remaining credits, syncs stop automatically.
+
+**Tips:** Keep `ODDS_REGIONS=us`. Sync match odds from admin once per match day, not repeatedly. Enter final scores manually in admin if you ever hit the daily cap.
 
 ### 7. Deploy to Vercel
 

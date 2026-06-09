@@ -1,40 +1,45 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/auth";
-import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium } from "@/lib/data";
+import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
+import { calculatePrizePool } from "@/lib/payouts";
 import { findNextUpcomingMatch } from "@/lib/nextPick";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
 import { getWorldCupKickoff, isMatchLocked } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
-import { MatchCard } from "@/components/MatchCard";
-import { MatchCommunityPicks } from "@/components/MatchCommunityPicks";
-import { TournamentPodiumCard } from "@/components/TournamentPodiumCard";
+import { HomeFeaturedMatchSection } from "@/components/HomeFeaturedMatchSection";
+import { HomePodiumSection } from "@/components/HomePodiumSection";
+import { HomeTopFive } from "@/components/HomeTopFive";
+import { findLiveMatch, isAnyMatchInPlayWindow } from "@/lib/matchLive";
 
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [{ leaderboard }, matches, predictions, settings, teams, myPodium] = await Promise.all([
+  const [{ leaderboard }, matches, predictions, settings, teams, myPodium, players] = await Promise.all([
     getLeaderboardData(),
     getMatchesWithTeams(),
     getPredictions(session.id),
     getSettings(),
     getTeams(),
     getMyTournamentPodium(session.id),
+    getPlayers(),
   ]);
+
+  const prizePool = calculatePrizePool(players.filter((p) => p.paid).length);
 
   const scoringConfig = scoringConfigFromSettings(settings);
   const predMap = new Map(predictions.map((p) => [p.match_id, p]));
   const upcomingMatch = findNextUpcomingMatch(matches);
+  const liveMatch = findLiveMatch(matches);
+  const featuredMatch = liveMatch ?? upcomingMatch;
   const worldCupKickoff = getWorldCupKickoff(matches);
   const firstMatchStarted = matches.some((m) => isMatchLocked(m));
   const podiumLocked = settings.big_predictions_locked || firstMatchStarted;
-  const communityPicks = upcomingMatch
-    ? await getConfirmedMatchPicks(upcomingMatch.id)
+  const communityPicks = featuredMatch
+    ? await getConfirmedMatchPicks(featuredMatch.id)
     : [];
-  const top5 = leaderboard.slice(0, 5);
 
   const missingKickoffs = matches.some((m) => !m.kickoff_at);
 
@@ -44,6 +49,7 @@ export default async function HomePage() {
         logo
         title="Family Cup 2026"
         subtitle="Pick scores. Win points. · Every game counts."
+        prizePool={prizePool}
       />
 
       {missingKickoffs && session.is_admin && (
@@ -52,7 +58,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      <TournamentPodiumCard
+      <HomePodiumSection
         teams={teams}
         myPodium={myPodium}
         locked={podiumLocked}
@@ -60,65 +66,23 @@ export default async function HomePage() {
         championProbabilities={settings.champion_probabilities}
       />
 
-      {upcomingMatch ? (
-        <section className="card p-0 overflow-hidden">
-          <div className="px-4 sm:px-5 py-3 border-b border-ink/5 bg-cream/30">
-            <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
-              Upcoming game
-            </h2>
-            <p className="text-xs text-ink-muted mt-0.5">
-              Make your pick, then see what everyone else is going with
-            </p>
-          </div>
-          <MatchCard
-            match={upcomingMatch}
-            prediction={predMap.get(upcomingMatch.id)}
-            scoringConfig={scoringConfig}
-            showPickCountdown
-            embedded
-          />
-          <MatchCommunityPicks
-            match={upcomingMatch}
-            picks={communityPicks}
-            currentPlayerId={session.id}
-            scoringConfig={scoringConfig}
-            embedded
-          />
-        </section>
+      {featuredMatch ? (
+        <HomeFeaturedMatchSection
+          match={featuredMatch}
+          prediction={predMap.get(featuredMatch.id)}
+          picks={communityPicks}
+          currentPlayerId={session.id}
+          scoringConfig={scoringConfig}
+        />
       ) : (
         <AllPicksDoneHero />
       )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-0.5">
-          <h2 className="section-title">Top 5</h2>
-          <Link
-            href="/leaderboard"
-            className="text-xs font-semibold text-gold-light hover:text-gold transition-colors"
-          >
-            See all →
-          </Link>
-        </div>
-        <div className="card p-0 overflow-hidden">
-          {top5.map((entry) => (
-            <div key={entry.playerId} className="lb-row">
-              <span className="w-7 text-center font-bold text-ink-faint text-sm">
-                {entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : entry.rank === 3 ? "🥉" : entry.rank}
-              </span>
-              <span className="flex-1 font-semibold text-ink truncate">
-                {entry.avatarEmoji} {entry.displayName}
-              </span>
-              <span className="font-extrabold text-usa tabular-nums">
-                {entry.totalPoints}
-                <span className="text-xs font-normal text-ink-faint ml-0.5">pts</span>
-              </span>
-            </div>
-          ))}
-          {top5.length === 0 && (
-            <p className="text-center text-ink-faint py-6 text-sm">No players yet</p>
-          )}
-        </div>
-      </section>
+      <HomeTopFive
+        initialEntries={leaderboard}
+        prizePool={prizePool}
+        pollLive={isAnyMatchInPlayWindow(matches)}
+      />
     </div>
   );
 }

@@ -83,5 +83,14 @@ assert(
   "final score beats draft pick"
 );
 
+assert(
+  getEffectivePickScore(
+    { ...match1, status: "live", home_score: 0, away_score: 2 },
+    { home: 2, away: 0 },
+    null
+  )?.away === 2,
+  "live score beats saved pick"
+);
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

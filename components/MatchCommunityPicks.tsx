@@ -4,8 +4,11 @@ import {
   DEFAULT_SCORING_CONFIG,
   type ScoringConfig,
 } from "@/lib/scoringConfig";
+import { scoreMatchPrediction } from "@/lib/scoring";
 import type { Match } from "@/lib/types";
 import { isKnockoutStage } from "@/lib/types";
+import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
+import { RecentPickFormDots } from "./RecentPickFormDots";
 
 function formatPickScore(
   pick: CommunityMatchPick,
@@ -55,12 +58,14 @@ export function MatchCommunityPicks({
   currentPlayerId,
   embedded = false,
   scoringConfig = DEFAULT_SCORING_CONFIG,
+  showLivePoints = false,
 }: {
   match: Match;
   picks: CommunityMatchPick[];
   currentPlayerId: string;
   embedded?: boolean;
   scoringConfig?: ScoringConfig;
+  showLivePoints?: boolean;
 }) {
   const sortedPicks = [...picks].sort((a, b) => {
     const aPts = maxPointsIfCorrect(match, a, scoringConfig) ?? -1;
@@ -79,14 +84,28 @@ export function MatchCommunityPicks({
         sortedPicks.map((pick) => {
           const isYou = pick.playerId === currentPlayerId;
           const maxPts = maxPointsIfCorrect(match, pick, scoringConfig);
+          const livePts =
+            showLivePoints && match.status === "live"
+              ? scoreMatchPrediction(
+                  match,
+                  {
+                    pred_home_score: pick.predHomeScore,
+                    pred_away_score: pick.predAwayScore,
+                    pred_winner_team_id: pick.predWinnerTeamId,
+                  },
+                  scoringConfig,
+                  { allowLive: true }
+                ).points
+              : null;
           return (
             <div
               key={pick.playerId}
               className={`lb-row ${isYou ? "bg-usa/5" : ""}`}
             >
-              <span className="w-7 text-center shrink-0 text-base">
-                {pick.avatarEmoji}
-              </span>
+              <PlayerPodiumFlags
+                picks={pick.podiumPicks}
+                fallbackEmoji={pick.avatarEmoji}
+              />
               <span className="flex-1 min-w-0 font-semibold text-ink truncate">
                 {pick.displayName}
                 {isYou && (
@@ -95,15 +114,24 @@ export function MatchCommunityPicks({
                   </span>
                 )}
               </span>
-              <span className="shrink-0 text-right leading-tight">
-                <span className="font-extrabold text-ink tabular-nums">
-                  {formatPickScore(pick, match)}
-                </span>
-                {maxPts != null && (
-                  <span className="block text-[10px] font-medium text-ink-faint tabular-nums mt-0.5">
-                    +{maxPts} if correct
+              <span className="shrink-0 text-right leading-tight flex items-center gap-2">
+                <RecentPickFormDots form={pick.recentForm ?? []} />
+                <span>
+                  <span className="font-extrabold text-ink tabular-nums">
+                    {formatPickScore(pick, match)}
                   </span>
-                )}
+                  {livePts != null ? (
+                    <span className="block text-[10px] font-medium text-mexico tabular-nums mt-0.5">
+                      +{livePts} pts if it ended now
+                    </span>
+                  ) : (
+                    maxPts != null && (
+                      <span className="block text-[10px] font-medium text-ink-faint tabular-nums mt-0.5">
+                        +{maxPts} if correct
+                      </span>
+                    )
+                  )}
+                </span>
               </span>
             </div>
           );
