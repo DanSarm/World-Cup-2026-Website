@@ -3,7 +3,7 @@ import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/auth";
 import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
 import { calculatePrizePool } from "@/lib/payouts";
-import { findNextUpcomingMatch } from "@/lib/nextPick";
+import { findNextUpcomingMatches } from "@/lib/nextPick";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
 import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
@@ -31,14 +31,20 @@ export default async function HomePage() {
 
   const scoringConfig = scoringConfigFromSettings(settings);
   const predMap = new Map(predictions.map((p) => [p.match_id, p]));
-  const upcomingMatch = findNextUpcomingMatch(matches);
   const liveMatch = findLiveMatch(matches);
-  const featuredMatch = liveMatch ?? upcomingMatch;
+  const upcomingMatches = findNextUpcomingMatches(matches, 2);
   const worldCupKickoff = getWorldCupKickoff(matches);
   const podiumLocked = isTournamentPodiumLocked(settings, matches);
-  const communityPicks = featuredMatch
-    ? await getConfirmedMatchPicks(featuredMatch.id)
-    : [];
+
+  const matchIdsToLoad = [
+    ...(liveMatch ? [liveMatch.id] : []),
+    ...upcomingMatches.map((m) => m.id),
+  ];
+  const communityPicksByMatchId = new Map(
+    await Promise.all(
+      matchIdsToLoad.map(async (id) => [id, await getConfirmedMatchPicks(id)] as const)
+    )
+  );
 
   const missingKickoffs = matches.some((m) => !m.kickoff_at);
 
@@ -65,17 +71,29 @@ export default async function HomePage() {
         championProbabilities={settings.champion_probabilities}
       />
 
-      {featuredMatch ? (
+      {liveMatch && (
         <HomeFeaturedMatchSection
-          match={featuredMatch}
-          prediction={predMap.get(featuredMatch.id)}
-          picks={communityPicks}
+          match={liveMatch}
+          prediction={predMap.get(liveMatch.id)}
+          picks={communityPicksByMatchId.get(liveMatch.id) ?? []}
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
         />
-      ) : (
-        <AllPicksDoneHero />
       )}
+
+      {upcomingMatches.map((match, index) => (
+        <HomeFeaturedMatchSection
+          key={match.id}
+          match={match}
+          prediction={predMap.get(match.id)}
+          picks={communityPicksByMatchId.get(match.id) ?? []}
+          currentPlayerId={session.id}
+          scoringConfig={scoringConfig}
+          sectionLabel={index === 0 ? "Next game" : "Up next"}
+        />
+      ))}
+
+      {!liveMatch && upcomingMatches.length === 0 && <AllPicksDoneHero />}
 
       <HomeTopFive
         initialEntries={leaderboard}

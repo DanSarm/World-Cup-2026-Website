@@ -7,8 +7,10 @@ import type { FlagSize } from "@/lib/flags";
 import { saveTournamentPodiumPlaceAction } from "@/lib/actions";
 import { previewPodiumPlacePoints, PODIUM_FORM_PLACE } from "@/lib/podiumPreview";
 import { calculateTeamTournamentValue } from "@/lib/tournamentValue";
+import { isPodiumIncomplete } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { PickCountdownBadge } from "./PickCountdown";
+import { UrgentPill } from "./UrgentPill";
 import type { Team, TournamentPodiumPrediction } from "@/lib/types";
 
 interface TournamentPodiumCardProps {
@@ -59,18 +61,24 @@ export function TournamentPodiumCard({
   companionOutside,
 }: TournamentPodiumCardProps) {
   const confirmed = myPodium?.podium_confirmed === true;
+  const podiumUrgent = !locked && isPodiumIncomplete(myPodium);
   const hasOutsideRail = !!companionOutside;
   const hasCompanionLayout = !!companion || hasOutsideRail;
 
   const header = (
     <div className="home-podium-header flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="section-title min-w-0">Tournament Picks</h2>
+      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+        <h2 className="section-title min-w-0">Tournament Picks</h2>
+        {podiumUrgent && <UrgentPill />}
+      </div>
       <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
         {!locked && worldCupKickoff && (
           <PickCountdownBadge kickoffAt={worldCupKickoff} label="until WC" />
         )}
         {locked && <span className="badge badge-locked">Closed</span>}
-        {confirmed && !locked && <span className="badge badge-open">Saved</span>}
+        {confirmed && !locked && !podiumUrgent && (
+          <span className="badge badge-open">Saved</span>
+        )}
       </div>
     </div>
   );

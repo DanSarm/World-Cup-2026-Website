@@ -1,4 +1,4 @@
-import type { Match, MatchPrediction } from "./types";
+import type { Match, MatchPrediction, TournamentPodiumPrediction } from "./types";
 import { isMatchLocked } from "./utils";
 
 /** True only when the player explicitly locked/saved this pick. */
@@ -47,4 +47,15 @@ export function usesDefaultMissingPick(
   prediction?: MatchPrediction | null
 ): boolean {
   return !hasSavedPick(prediction) && isMatchLocked(match);
+}
+
+export function isPodiumIncomplete(
+  myPodium?: TournamentPodiumPrediction | null
+): boolean {
+  if (!myPodium) return true;
+  return (
+    !myPodium.first_place_team_id ||
+    !myPodium.second_place_team_id ||
+    !myPodium.third_place_team_id
+  );
 }

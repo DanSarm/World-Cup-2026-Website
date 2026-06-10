@@ -11,6 +11,9 @@ import {
   useLiveRefresh,
 } from "@/lib/hooks/useLiveRefresh";
 import { isMatchInPlayWindow, isMatchLive } from "@/lib/matchLive";
+import { canPickMatch } from "@/lib/utils";
+import { hasSavedPick } from "@/lib/pickUtils";
+import { UrgentPill } from "./UrgentPill";
 
 interface HomeFeaturedMatchSectionProps {
   match: Match;
@@ -18,6 +21,8 @@ interface HomeFeaturedMatchSectionProps {
   picks: CommunityMatchPick[];
   currentPlayerId: string;
   scoringConfig: ScoringConfig;
+  /** Override section heading (e.g. "Next game", "Up next"). */
+  sectionLabel?: string;
 }
 
 export function HomeFeaturedMatchSection({
@@ -26,6 +31,7 @@ export function HomeFeaturedMatchSection({
   picks,
   currentPlayerId,
   scoringConfig,
+  sectionLabel,
 }: HomeFeaturedMatchSectionProps) {
   const pollLive =
     isMatchLive(initialMatch) || isMatchInPlayWindow(initialMatch);
@@ -37,6 +43,9 @@ export function HomeFeaturedMatchSection({
   );
 
   const isLive = isMatchLive(match);
+  const needsPick = canPickMatch(match) && !hasSavedPick(prediction);
+  const heading =
+    sectionLabel ?? (isLive ? "Live now" : "Upcoming game");
 
   const mostPickedScore = useMemo(() => {
     if (!picks.length) return null;
@@ -63,9 +72,12 @@ export function HomeFeaturedMatchSection({
   return (
     <section className="card p-0 overflow-hidden">
       <div className="px-4 sm:px-5 py-3 border-b border-ink/5 bg-cream/30">
-        <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
-          {isLive ? "Live now" : "Upcoming game"}
-        </h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
+            {heading}
+          </h2>
+          {needsPick && <UrgentPill />}
+        </div>
         <p className="text-xs text-ink-muted mt-0.5">
           {isLive
             ? "Live score updates every ~10 minutes · standings reflect the current score"

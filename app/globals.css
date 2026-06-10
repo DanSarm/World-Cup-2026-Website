@@ -167,6 +167,32 @@ body {
   color: var(--color-gold-dark);
 }
 
+.urgent-pill {
+  @apply inline-flex items-center shrink-0 text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full;
+  color: var(--color-canada);
+  background: rgb(200 16 46 / 0.14);
+  border: 1px solid rgb(200 16 46 / 0.28);
+  box-shadow: 0 0 0 0 rgb(200 16 46 / 0.35);
+  animation: urgent-pill-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes urgent-pill-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(200 16 46 / 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgb(200 16 46 / 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .urgent-pill {
+    animation: none;
+  }
+}
+
 .segmented {
   @apply flex p-1 rounded-xl gap-1;
   background: rgb(255 255 255 / 0.08);
