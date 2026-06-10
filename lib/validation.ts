@@ -63,6 +63,14 @@ export const tournamentPodiumSchema = z
     { message: "Pick three different teams" }
   );
 
+export const tournamentPodiumPlaceKeySchema = z.enum([
+  "firstPlaceTeamId",
+  "secondPlaceTeamId",
+  "thirdPlaceTeamId",
+]);
+
+export const teamIdSchema = z.string().uuid();
+
 export const bigPickSchema = z.object({
   groupWinners: z.record(z.string(), z.string().uuid()),
   groupRunnersUp: z.record(z.string(), z.string().uuid()),

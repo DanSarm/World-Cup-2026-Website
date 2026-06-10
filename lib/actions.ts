@@ -15,6 +15,8 @@ import {
   loginSchema,
   matchPickSchema,
   tournamentPodiumSchema,
+  tournamentPodiumPlaceKeySchema,
+  teamIdSchema,
   payoutSchema,
   matchResultSchema,
 } from "./validation";
@@ -178,6 +180,94 @@ export async function saveTournamentPodiumAction(formData: FormData) {
   }
 
   await logAudit(session.id, "save_tournament_podium", {});
+  revalidatePath("/picks");
+  revalidatePath("/");
+  revalidatePath("/leaderboard");
+  return { success: true };
+}
+
+const PODIUM_FIELD_BY_KEY = {
+  firstPlaceTeamId: "first_place_team_id",
+  secondPlaceTeamId: "second_place_team_id",
+  thirdPlaceTeamId: "third_place_team_id",
+} as const;
+
+export async function saveTournamentPodiumPlaceAction(
+  placeKey: string,
+  teamId: string
+) {
+  const session = await requireSession();
+  const settings = await getSettings();
+  const matches = await getMatchesWithTeams();
+  if (isTournamentPodiumLocked(settings, matches)) {
+    return { error: "Tournament podium picks are locked" };
+  }
+
+  const parsedKey = tournamentPodiumPlaceKeySchema.safeParse(placeKey);
+  if (!parsedKey.success) {
+    return { error: "Invalid podium place" };
+  }
+
+  const parsedTeamId = teamIdSchema.safeParse(teamId);
+  if (!parsedTeamId.success) {
+    return { error: "Invalid team" };
+  }
+
+  const supabase = getSupabase();
+  const { data: existing } = await supabase
+    .from("tournament_podium_predictions")
+    .select("first_place_team_id, second_place_team_id, third_place_team_id")
+    .eq("player_id", session.id)
+    .maybeSingle();
+
+  const merged = {
+    first_place_team_id: existing?.first_place_team_id ?? null,
+    second_place_team_id: existing?.second_place_team_id ?? null,
+    third_place_team_id: existing?.third_place_team_id ?? null,
+  };
+  merged[PODIUM_FIELD_BY_KEY[parsedKey.data]] = parsedTeamId.data;
+
+  const picked = [
+    merged.first_place_team_id,
+    merged.second_place_team_id,
+    merged.third_place_team_id,
+  ].filter((id): id is string => !!id);
+  if (new Set(picked).size !== picked.length) {
+    return { error: "Pick three different teams" };
+  }
+
+  const { error } = await supabase.from("tournament_podium_predictions").upsert(
+    {
+      player_id: session.id,
+      ...merged,
+      podium_confirmed: true,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "player_id" }
+  );
+
+  if (error) {
+    if (error.message.includes("podium_confirmed")) {
+      const { error: legacyError } = await supabase
+        .from("tournament_podium_predictions")
+        .upsert(
+          {
+            player_id: session.id,
+            ...merged,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "player_id" }
+        );
+      if (legacyError) return { error: "Could not save podium pick" };
+    } else {
+      return { error: "Could not save podium pick" };
+    }
+  }
+
+  await logAudit(session.id, "save_tournament_podium_place", {
+    placeKey: parsedKey.data,
+    teamId: parsedTeamId.data,
+  });
   revalidatePath("/picks");
   revalidatePath("/");
   revalidatePath("/leaderboard");
