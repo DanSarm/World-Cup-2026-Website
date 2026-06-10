@@ -8,7 +8,7 @@ import {
   getMyTournamentPodium,
 } from "@/lib/data";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
-import { isMatchLocked, getWorldCupKickoff } from "@/lib/utils";
+import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { resolveMatchesForPicks } from "@/lib/resolvedMatches";
 import { ensureDefaultPredictionsForPlayer } from "@/lib/defaultPredictions";
 import { PicksClient } from "@/components/PicksClient";
@@ -29,8 +29,7 @@ export default async function PicksPage() {
   predictions = await getPredictions(session.id);
 
   const scoringConfig = scoringConfigFromSettings(settings);
-  const firstMatchStarted = matches.some((m) => isMatchLocked(m));
-  const podiumLocked = settings.big_predictions_locked || firstMatchStarted;
+  const podiumLocked = isTournamentPodiumLocked(settings, matches);
   const worldCupKickoff = getWorldCupKickoff(matches);
 
   const pickMatches = resolveMatchesForPicks(matches);

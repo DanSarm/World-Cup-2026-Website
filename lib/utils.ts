@@ -14,6 +14,14 @@ export function formatDateHeader(kickoffAt: string | null): string {
   return formatInTimeZone(parseISO(kickoffAt), TZ, "EEEE, MMM d");
 }
 
+export function isTournamentPodiumLocked(
+  settings: { big_predictions_locked: boolean },
+  matches: Pick<Match, "status" | "kickoff_at">[]
+): boolean {
+  if (settings.big_predictions_locked) return true;
+  return matches.some((m) => isMatchLocked(m));
+}
+
 export function isMatchLocked(
   match: Pick<Match, "status" | "kickoff_at">
 ): boolean {

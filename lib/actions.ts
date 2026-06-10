@@ -18,8 +18,8 @@ import {
   payoutSchema,
   matchResultSchema,
 } from "./validation";
-import { isMatchLocked } from "./utils";
-import { recalculateAllScores } from "./data";
+import { isMatchLocked, isTournamentPodiumLocked } from "./utils";
+import { getMatchesWithTeams, recalculateAllScores } from "./data";
 import { POOL_ENTRY_FEE } from "./payouts";
 import type { Match } from "./types";
 
@@ -128,35 +128,12 @@ export async function saveMatchPickAction(formData: FormData) {
 export async function saveTournamentPodiumAction(formData: FormData) {
   const session = await requireSession();
   const settings = await getSettings();
-  if (settings.big_predictions_locked) {
+  const matches = await getMatchesWithTeams();
+  if (isTournamentPodiumLocked(settings, matches)) {
     return { error: "Tournament podium picks are locked" };
   }
 
   const supabase = getSupabase();
-  const { data: startedMatch } = await supabase
-    .from("matches")
-    .select("id")
-    .or("status.eq.final,status.eq.locked")
-    .limit(1)
-    .maybeSingle();
-
-  if (!startedMatch) {
-    const { data: pastKickoff } = await supabase
-      .from("matches")
-      .select("id, kickoff_at")
-      .not("kickoff_at", "is", null)
-      .limit(50);
-    const now = Date.now();
-    if (
-      pastKickoff?.some(
-        (m) => m.kickoff_at && new Date(m.kickoff_at).getTime() <= now
-      )
-    ) {
-      return { error: "Tournament podium picks are locked" };
-    }
-  } else {
-    return { error: "Tournament podium picks are locked" };
-  }
 
   const parsed = tournamentPodiumSchema.safeParse({
     firstPlaceTeamId: formData.get("firstPlaceTeamId"),
@@ -166,16 +143,6 @@ export async function saveTournamentPodiumAction(formData: FormData) {
 
   if (!parsed.success) {
     return { error: parsed.error.errors[0]?.message ?? "Invalid picks" };
-  }
-
-  const { data: existing } = await supabase
-    .from("tournament_podium_predictions")
-    .select("podium_confirmed")
-    .eq("player_id", session.id)
-    .maybeSingle();
-
-  if (existing?.podium_confirmed) {
-    return { error: "Podium picks are already locked in" };
   }
 
   const { error } = await supabase.from("tournament_podium_predictions").upsert(

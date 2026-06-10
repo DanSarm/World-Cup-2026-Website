@@ -41,11 +41,11 @@ export function PodiumConfirmModal({
               id="podium-confirm-title"
               className="text-lg font-extrabold text-usa leading-tight"
             >
-              Lock in your podium?
+              Save your podium picks?
             </h2>
             <p className="text-sm text-ink-muted leading-relaxed">
-              You won&apos;t be able to change these picks after saving. Make
-              sure you&apos;re happy with your choices.
+              You can update these anytime until the first match kicks off.
+              After that, picks close for the whole tournament.
             </p>
           </div>
         </div>
@@ -81,7 +81,7 @@ export function PodiumConfirmModal({
             disabled={pending}
             className="btn-primary flex-1 py-3"
           >
-            {pending ? "Saving..." : "Yes, lock it in"}
+            {pending ? "Saving..." : "Yes, save picks"}
           </button>
         </div>
       </div>

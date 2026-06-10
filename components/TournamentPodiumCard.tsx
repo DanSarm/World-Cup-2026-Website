@@ -88,7 +88,8 @@ export function TournamentPodiumCard({
   });
 
   const confirmed = myPodium?.podium_confirmed === true;
-  const readOnly = locked || confirmed;
+  // Only lock when the tournament has started (or admin closed picks).
+  const readOnly = locked;
 
   function openConfirm() {
     setError(null);
@@ -147,11 +148,11 @@ export function TournamentPodiumCard({
         {!readOnly && worldCupKickoff && (
           <PickCountdownBadge kickoffAt={worldCupKickoff} label="until WC" />
         )}
-        {confirmed && (
-          <span className="badge badge-locked shrink-0">🔒 Locked in</span>
-        )}
-        {locked && !confirmed && (
+        {locked && (
           <span className="badge badge-locked shrink-0">🔒 Closed</span>
+        )}
+        {confirmed && !locked && (
+          <span className="badge badge-open shrink-0">✓ Saved</span>
         )}
       </div>
     </div>
@@ -170,8 +171,8 @@ export function TournamentPodiumCard({
     <>
       <p className="text-sm text-ink-muted">
         Pick the Champion, Runner-up, and Third Place. Favorites are worth
-        fewer points — longshots pay big. Once saved, your picks cannot be
-        changed.
+        fewer points — longshots pay big. You can update your picks until the
+        first match kicks off.
       </p>
 
       {PLACES.map(({ key, label, medal }) => {
@@ -243,7 +244,7 @@ export function TournamentPodiumCard({
         disabled={pending}
         className="btn-primary w-full"
       >
-        Save Podium Picks
+        {confirmed ? "Update Podium Picks" : "Save Podium Picks"}
       </button>
     </>
   );

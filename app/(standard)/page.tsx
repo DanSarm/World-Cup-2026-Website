@@ -5,7 +5,7 @@ import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMa
 import { calculatePrizePool } from "@/lib/payouts";
 import { findNextUpcomingMatch } from "@/lib/nextPick";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
-import { getWorldCupKickoff, isMatchLocked } from "@/lib/utils";
+import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
 import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
 import { HomeFeaturedMatchSection } from "@/components/HomeFeaturedMatchSection";
@@ -35,8 +35,7 @@ export default async function HomePage() {
   const liveMatch = findLiveMatch(matches);
   const featuredMatch = liveMatch ?? upcomingMatch;
   const worldCupKickoff = getWorldCupKickoff(matches);
-  const firstMatchStarted = matches.some((m) => isMatchLocked(m));
-  const podiumLocked = settings.big_predictions_locked || firstMatchStarted;
+  const podiumLocked = isTournamentPodiumLocked(settings, matches);
   const communityPicks = featuredMatch
     ? await getConfirmedMatchPicks(featuredMatch.id)
     : [];
