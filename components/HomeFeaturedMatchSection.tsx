@@ -38,6 +38,28 @@ export function HomeFeaturedMatchSection({
 
   const isLive = isMatchLive(match);
 
+  const mostPickedScore = useMemo(() => {
+    if (!picks.length) return null;
+    const counts = new Map<string, number>();
+    for (const p of picks) {
+      const key = `${p.predHomeScore}–${p.predAwayScore}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    let bestScore: string | null = null;
+    let bestCount = 0;
+    for (const [score, count] of counts) {
+      if (count > bestCount) {
+        bestScore = score;
+        bestCount = count;
+      }
+    }
+    if (!bestScore) return null;
+    return {
+      score: bestScore,
+      percent: Math.round((bestCount / picks.length) * 100),
+    };
+  }, [picks]);
+
   return (
     <section className="card p-0 overflow-hidden">
       <div className="px-4 sm:px-5 py-3 border-b border-ink/5 bg-cream/30">
@@ -56,6 +78,7 @@ export function HomeFeaturedMatchSection({
         scoringConfig={scoringConfig}
         showPickCountdown={!isLive}
         embedded
+        mostPickedScore={isLive ? null : mostPickedScore}
       />
       <MatchCommunityPicks
         match={match}

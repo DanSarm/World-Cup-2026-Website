@@ -277,6 +277,8 @@ export interface LeaderboardEntry {
   provisionalTotalPoints?: number;
   /** Extra points from live match(es) not yet final */
   livePoints?: number;
+  /** Rank change vs before the most recent results day */
+  rankMovement?: "up" | "down" | "same";
 }
 
 export interface SessionPlayer {

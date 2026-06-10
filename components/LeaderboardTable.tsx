@@ -41,6 +41,28 @@ export function LeaderboardTable({
     return "";
   };
 
+  const movementDisplay = (movement?: LeaderboardEntry["rankMovement"]) => {
+    if (movement === "up") {
+      return (
+        <span className="block text-[9px] leading-none mt-0.5 text-mexico-light" aria-label="Moved up">
+          ▲
+        </span>
+      );
+    }
+    if (movement === "down") {
+      return (
+        <span className="block text-[9px] leading-none mt-0.5 text-canada" aria-label="Moved down">
+          ▼
+        </span>
+      );
+    }
+    return (
+      <span className="block text-[9px] leading-none mt-0.5 text-ink/20" aria-label="No change">
+        —
+      </span>
+    );
+  };
+
   const renderEntry = (entry: LeaderboardEntry) => {
     const displayValue =
       hasLiveScoring && entry.provisionalTotalPoints != null
@@ -57,7 +79,8 @@ export function LeaderboardTable({
             entry.rank <= 3 ? "lb-entry-rank--medal" : ""
           }`}
         >
-          {rankDisplay(entry.rank)}
+          <span className="block">{rankDisplay(entry.rank)}</span>
+          {movementDisplay(entry.rankMovement)}
         </span>
 
         <div className="lb-entry-main min-w-0 flex-1">

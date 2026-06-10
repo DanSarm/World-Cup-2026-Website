@@ -15,6 +15,7 @@ import { isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { findLiveMatch, hasAnyLiveMatch } from "./matchLive";
+import { matchDateKey } from "./utils";
 import type {
   ActualTournamentResults,
   BigPrediction,
@@ -277,6 +278,70 @@ export async function getActualResults(): Promise<ActualTournamentResults> {
   return results;
 }
 
+/**
+ * Rank movement = current rank vs the leaderboard as it stood before the
+ * most recent day (ET) with final results. Those matches are reverted to
+ * "scheduled" and the board re-ranked to get the previous order.
+ */
+function attachRankMovement(
+  current: LeaderboardEntry[],
+  players: Player[],
+  matches: Match[],
+  predictions: MatchPrediction[],
+  podiumPredictions: TournamentPodiumPrediction[],
+  finalsPredictions: FinalsChallengePrediction[],
+  adjustments: ManualAdjustment[],
+  settings: Awaited<ReturnType<typeof getSettings>>,
+  actualResults: ActualTournamentResults,
+  teams: Team[]
+): LeaderboardEntry[] {
+  const finalDates = matches
+    .filter((m) => m.status === "final" && m.kickoff_at)
+    .map((m) => matchDateKey(m.kickoff_at));
+  const latestFinalDate = finalDates.sort().pop();
+
+  if (!latestFinalDate) {
+    return current.map((e) => ({ ...e, rankMovement: "same" as const }));
+  }
+
+  const priorMatches = matches.map((m) =>
+    m.status === "final" && matchDateKey(m.kickoff_at) === latestFinalDate
+      ? {
+          ...m,
+          status: "scheduled" as const,
+          home_score: null,
+          away_score: null,
+          winner_team_id: null,
+        }
+      : m
+  );
+
+  const previous = calculateLeaderboard(
+    players,
+    priorMatches,
+    predictions,
+    podiumPredictions,
+    finalsPredictions,
+    adjustments,
+    settings,
+    actualResults,
+    new Map(),
+    teams
+  );
+  const prevRankByPlayer = new Map(previous.map((e) => [e.playerId, e.rank]));
+
+  return current.map((entry) => {
+    const prevRank = prevRankByPlayer.get(entry.playerId);
+    const rankMovement =
+      prevRank == null || prevRank === entry.rank
+        ? ("same" as const)
+        : prevRank > entry.rank
+          ? ("up" as const)
+          : ("down" as const);
+    return { ...entry, rankMovement };
+  });
+}
+
 export async function getLeaderboardData(options?: {
   includeLiveScores?: boolean;
 }): Promise<{
@@ -354,7 +419,20 @@ export async function getLeaderboardData(options?: {
   );
 
   const leaderboard = attachPlayerExtras(
-    calculateLeaderboard(
+    attachRankMovement(
+      calculateLeaderboard(
+        players,
+        matches,
+        scoredPredictions,
+        podiumPredictions,
+        finalsPredictions,
+        adjustments,
+        settings,
+        actualResults,
+        projectedPrizes,
+        teams,
+        { includeLiveScores }
+      ),
       players,
       matches,
       scoredPredictions,
@@ -363,9 +441,7 @@ export async function getLeaderboardData(options?: {
       adjustments,
       settings,
       actualResults,
-      projectedPrizes,
-      teams,
-      { includeLiveScores }
+      teams
     )
   );
 

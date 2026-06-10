@@ -42,13 +42,24 @@ export function PicksClient({
   worldCupKickoff,
 }: PicksClientProps) {
   const [filter, setFilter] = useState<PicksFilter>("need");
+  const [teamFilter, setTeamFilter] = useState<string>("");
 
   const predMap = useMemo(
     () => new Map(predictions.map((p) => [p.match_id, p])),
     [predictions]
   );
 
-  const sections = useMemo(() => groupMatchesForPicks(matches), [matches]);
+  const teamMatches = useMemo(() => {
+    if (!teamFilter) return matches;
+    return matches.filter(
+      (m) => m.home_team_id === teamFilter || m.away_team_id === teamFilter
+    );
+  }, [matches, teamFilter]);
+
+  const sections = useMemo(
+    () => groupMatchesForPicks(teamMatches),
+    [teamMatches]
+  );
   const filtered = useMemo(
     () => filterSections(sections, filter, predMap),
     [sections, filter, predMap]
@@ -97,7 +108,7 @@ export function PicksClient({
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -108,6 +119,23 @@ export function PicksClient({
             {f.label}
           </button>
         ))}
+        <select
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          aria-label="Filter by team"
+          className={`filter-pill ml-auto shrink-0 cursor-pointer appearance-none ${teamFilter ? "filter-pill-active" : ""}`}
+        >
+          <option value="" className="bg-white text-black">
+            🌍 All teams
+          </option>
+          {[...teams]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((t) => (
+              <option key={t.id} value={t.id} className="bg-white text-black">
+                {t.flag_emoji} {t.name}
+              </option>
+            ))}
+        </select>
       </div>
 
       {filtered.length === 0 ? (

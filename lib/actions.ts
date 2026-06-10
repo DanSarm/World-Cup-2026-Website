@@ -232,6 +232,47 @@ export async function adminTogglePaidAction(playerId: string, paid: boolean) {
   revalidatePath("/");
 }
 
+export async function adminDeletePlayerAction(playerId: string) {
+  const admin = await requireAdmin();
+  if (playerId === admin.id) {
+    return { error: "You can't remove yourself" };
+  }
+
+  const supabase = getSupabase();
+
+  const { data: player } = await supabase
+    .from("players")
+    .select("display_name")
+    .eq("id", playerId)
+    .single();
+  if (!player) return { error: "Player not found" };
+
+  // Clear non-cascading references first, then delete the player.
+  // Predictions, podium and finals picks cascade via FK.
+  await supabase.from("manual_adjustments").delete().eq("player_id", playerId);
+  await supabase
+    .from("manual_adjustments")
+    .update({ created_by: null })
+    .eq("created_by", playerId);
+  await supabase
+    .from("audit_log")
+    .update({ actor_player_id: null })
+    .eq("actor_player_id", playerId);
+
+  const { error } = await supabase.from("players").delete().eq("id", playerId);
+  if (error) return { error: error.message };
+
+  await logAudit(admin.id, "delete_player", {
+    playerId,
+    displayName: player.display_name,
+  });
+  revalidatePath("/admin");
+  revalidatePath("/leaderboard");
+  revalidatePath("/");
+  revalidatePath("/picks");
+  return { success: true };
+}
+
 export async function adminToggleAdminAction(playerId: string, isAdmin: boolean) {
   const admin = await requireAdmin();
   const supabase = getSupabase();

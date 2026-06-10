@@ -28,6 +28,8 @@ interface MatchCardProps {
   showPickCountdown?: boolean;
   /** Render inside a parent card (no outer card shell). */
   embedded?: boolean;
+  /** Community consensus, e.g. { score: "2–1", percent: 45 } */
+  mostPickedScore?: { score: string; percent: number } | null;
 }
 
 export function MatchCard({
@@ -37,6 +39,7 @@ export function MatchCard({
   onPickChange,
   showPickCountdown = false,
   embedded = false,
+  mostPickedScore = null,
 }: MatchCardProps) {
   const router = useRouter();
   const saved = hasSavedPick(prediction);
@@ -234,8 +237,25 @@ export function MatchCard({
 
       <MatchOddsBar match={match} />
 
-      {(hasAnyBonus(match) || exactPointsPreview != null) && (
+      {(hasAnyBonus(match) || exactPointsPreview != null || mostPickedScore) && (
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+          {mostPickedScore && (
+            <div
+              className="leading-tight shrink-0"
+              title="The score most players picked for this match"
+            >
+              <span className="text-base font-extrabold text-usa tabular-nums">
+                {mostPickedScore.score}
+                <span className="text-xs font-bold text-ink-muted">
+                  {" "}
+                  · {mostPickedScore.percent}%
+                </span>
+              </span>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                Most-picked score
+              </span>
+            </div>
+          )}
           <MatchBonusPills match={match} />
           {exactPointsPreview != null && (
             <PickPointsPreview
