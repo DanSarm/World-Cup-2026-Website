@@ -115,13 +115,35 @@ export interface CommunityMatchPick {
 export async function getConfirmedMatchPicks(
   matchId: string
 ): Promise<CommunityMatchPick[]> {
+  const byMatch = await getConfirmedMatchPicksByMatchIds([matchId]);
+  return byMatch.get(matchId) ?? [];
+}
+
+type CommunityPickRow = {
+  match_id: string;
+  player_id: string;
+  pred_home_score: number;
+  pred_away_score: number;
+  pred_winner_team_id: string | null;
+  pick_confirmed?: boolean;
+  players:
+    | { display_name: string; avatar_emoji: string | null }
+    | { display_name: string; avatar_emoji: string | null }[]
+    | null;
+};
+
+async function fetchConfirmedPickRows(
+  matchIds: string[]
+): Promise<CommunityPickRow[]> {
+  if (matchIds.length === 0) return [];
+
   const supabase = getSupabase();
   const primary = await supabase
     .from("match_predictions")
     .select(
-      "player_id, pred_home_score, pred_away_score, pred_winner_team_id, pick_confirmed, players(display_name, avatar_emoji)"
+      "match_id, player_id, pred_home_score, pred_away_score, pred_winner_team_id, pick_confirmed, players(display_name, avatar_emoji)"
     )
-    .eq("match_id", matchId)
+    .in("match_id", matchIds)
     .eq("pick_confirmed", true);
 
   let rows: unknown[] | null = primary.data;
@@ -131,29 +153,29 @@ export async function getConfirmedMatchPicks(
     const fallback = await supabase
       .from("match_predictions")
       .select(
-        "player_id, pred_home_score, pred_away_score, pred_winner_team_id, players(display_name, avatar_emoji)"
+        "match_id, player_id, pred_home_score, pred_away_score, pred_winner_team_id, players(display_name, avatar_emoji)"
       )
-      .eq("match_id", matchId);
+      .in("match_id", matchIds);
     rows = fallback.data;
     error = fallback.error;
   }
 
   if (error || !rows) return [];
+  return rows as CommunityPickRow[];
+}
 
-  type PlayerRef = { display_name: string; avatar_emoji: string | null };
-  type Row = {
-    player_id: string;
-    pred_home_score: number;
-    pred_away_score: number;
-    pred_winner_team_id: string | null;
-    pick_confirmed?: boolean;
-    players: PlayerRef | PlayerRef[] | null;
-  };
+export async function getConfirmedMatchPicksByMatchIds(
+  matchIds: string[]
+): Promise<Map<string, CommunityMatchPick[]>> {
+  const uniqueMatchIds = [...new Set(matchIds)];
+  const byMatch = new Map<string, CommunityMatchPick[]>(
+    uniqueMatchIds.map((id) => [id, []])
+  );
+  if (uniqueMatchIds.length === 0) return byMatch;
 
-  const parsedRows = rows as Row[];
-  const playerIds = parsedRows
-    .filter((row) => row.pick_confirmed !== false)
-    .map((row) => row.player_id);
+  const rows = await fetchConfirmedPickRows(uniqueMatchIds);
+  const confirmedRows = rows.filter((row) => row.pick_confirmed !== false);
+  const playerIds = [...new Set(confirmedRows.map((row) => row.player_id))];
 
   const [teams, podiumPredictions, matches, allPredictions, settings] =
     await Promise.all([
@@ -174,11 +196,10 @@ export async function getConfirmedMatchPicks(
     scoringConfig
   );
 
-  const picks: CommunityMatchPick[] = [];
-  for (const row of parsedRows.filter((r) => r.pick_confirmed !== false)) {
+  for (const row of confirmedRows) {
     const player = Array.isArray(row.players) ? row.players[0] : row.players;
     if (!player) continue;
-    picks.push({
+    const pick: CommunityMatchPick = {
       playerId: row.player_id,
       displayName: player.display_name,
       avatarEmoji: player.avatar_emoji ?? "⚽",
@@ -190,10 +211,17 @@ export async function getConfirmedMatchPicks(
         teams
       ),
       recentForm: recentFormByPlayer.get(row.player_id),
-    });
+    };
+    const list = byMatch.get(row.match_id) ?? [];
+    list.push(pick);
+    byMatch.set(row.match_id, list);
   }
 
-  return picks.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  for (const picks of byMatch.values()) {
+    picks.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
+  return byMatch;
 }
 
 export async function getTournamentPodiumPredictions(): Promise<

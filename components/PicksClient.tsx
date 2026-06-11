@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { MatchCard } from "./MatchCard";
+import { PicksMatchCard } from "./PicksMatchCard";
+import type { CommunityMatchPick } from "@/lib/data";
 import { PageHeader } from "./PageHeader";
 import {
   groupMatchesForPicks,
@@ -23,6 +24,9 @@ interface PicksClientProps {
   myPodium?: TournamentPodiumPrediction | null;
   podiumLocked: boolean;
   worldCupKickoff: string | null;
+  currentPlayerId: string;
+  totalPlayers: number;
+  communityPicksByMatchId: Record<string, CommunityMatchPick[]>;
 }
 
 const FILTERS: { key: PicksFilter; label: string }[] = [
@@ -40,6 +44,9 @@ export function PicksClient({
   myPodium,
   podiumLocked,
   worldCupKickoff,
+  currentPlayerId,
+  totalPlayers,
+  communityPicksByMatchId,
 }: PicksClientProps) {
   const [filter, setFilter] = useState<PicksFilter>("need");
   const [teamFilter, setTeamFilter] = useState<string>("");
@@ -153,13 +160,16 @@ export function PicksClient({
                 <span className="text-xs text-on-dark-muted">{section.subtitle}</span>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
               {section.matches.map((m) => (
-                <MatchCard
+                <PicksMatchCard
                   key={m.id}
                   match={m}
                   prediction={predMap.get(m.id)}
                   scoringConfig={scoringConfig}
+                  picks={communityPicksByMatchId[m.id] ?? []}
+                  currentPlayerId={currentPlayerId}
+                  totalPlayers={totalPlayers}
                 />
               ))}
             </div>
