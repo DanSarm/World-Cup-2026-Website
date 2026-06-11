@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { adminTogglePaidAction, adminDeletePlayerAction } from "@/lib/actions";
 import { formatMoney, POOL_ENTRY_FEE } from "@/lib/payouts";
 import type { Player } from "@/lib/types";
@@ -12,25 +13,44 @@ interface AdminPaymentsProps {
 }
 
 export function AdminPayments({ players, prizePool }: AdminPaymentsProps) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  function togglePaid(id: string, paid: boolean) {
+  function setPaid(id: string, paid: boolean) {
+    setActionError(null);
     startTransition(async () => {
-      await adminTogglePaidAction(id, !paid);
+      await adminTogglePaidAction(id, paid);
+      router.refresh();
     });
   }
 
-  function removePlayer(player: Player) {
+  function togglePaid(id: string, paid: boolean) {
+    setPaid(id, !paid);
+  }
+
+  function removeFromPool(player: Player) {
     const confirmed = window.confirm(
-      `Remove ${player.display_name} from the site?\n\nThis permanently deletes their account, match picks, and tournament picks. This cannot be undone.`
+      `Remove ${player.display_name} from the paid pool?\n\nThey stay in the game and keep all picks — they just won't count toward the prize pool or Paid leaderboard.`
+    );
+    if (!confirmed) return;
+    setPaid(player.id, false);
+  }
+
+  function deletePlayer(player: Player) {
+    const confirmed = window.confirm(
+      `Delete ${player.display_name}'s account?\n\nThis permanently removes them from the site, including all picks. This cannot be undone.`
     );
     if (!confirmed) return;
 
-    setDeleteError(null);
+    setActionError(null);
     startTransition(async () => {
       const result = await adminDeletePlayerAction(player.id);
-      if (result?.error) setDeleteError(result.error);
+      if (result?.error) {
+        setActionError(result.error);
+        return;
+      }
+      router.refresh();
     });
   }
 
@@ -41,7 +61,7 @@ export function AdminPayments({ players, prizePool }: AdminPaymentsProps) {
       <PageHeader
         emoji="💵"
         title="Payments"
-        subtitle="Check off each player when they pay you $50"
+        subtitle="Mark paid when they send $50 · remove from pool anytime without deleting their account"
         prizePool={prizePool}
       />
 
@@ -60,8 +80,8 @@ export function AdminPayments({ players, prizePool }: AdminPaymentsProps) {
         </p>
       </div>
 
-      {deleteError && (
-        <p className="text-sm font-semibold text-canada">{deleteError}</p>
+      {actionError && (
+        <p className="text-sm font-semibold text-canada">{actionError}</p>
       )}
 
       <ul className="space-y-2">
@@ -86,20 +106,30 @@ export function AdminPayments({ players, prizePool }: AdminPaymentsProps) {
                 </span>
               </label>
               {player.paid && (
-                <span className="ml-auto text-sm font-bold text-mexico tabular-nums shrink-0">
-                  +{formatMoney(POOL_ENTRY_FEE)}
-                </span>
+                <>
+                  <span className="ml-auto text-sm font-bold text-mexico tabular-nums shrink-0">
+                    +{formatMoney(POOL_ENTRY_FEE)}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => removeFromPool(player)}
+                    className="shrink-0 text-xs font-bold uppercase tracking-wide text-ink-muted hover:text-ink hover:bg-ink/5 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    Remove from pool
+                  </button>
+                </>
               )}
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => removePlayer(player)}
-                aria-label={`Remove ${player.display_name}`}
+                onClick={() => deletePlayer(player)}
+                aria-label={`Delete ${player.display_name}`}
                 className={`shrink-0 text-xs font-bold uppercase tracking-wide text-canada/70 hover:text-canada hover:bg-canada/10 px-2.5 py-1.5 rounded-lg transition-colors ${
                   player.paid ? "" : "ml-auto"
                 }`}
               >
-                Remove
+                Delete account
               </button>
             </div>
           </li>

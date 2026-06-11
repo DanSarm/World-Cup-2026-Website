@@ -46,6 +46,7 @@ export default async function HomePage() {
     )
   );
 
+  const totalPlayers = players.length;
   const missingKickoffs = matches.some((m) => !m.kickoff_at);
 
   return (
@@ -78,6 +79,7 @@ export default async function HomePage() {
           picks={communityPicksByMatchId.get(liveMatch.id) ?? []}
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
+          totalPlayers={totalPlayers}
         />
       )}
 
@@ -90,6 +92,7 @@ export default async function HomePage() {
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
           sectionLabel={index === 0 ? "Next game" : "Up next"}
+          totalPlayers={totalPlayers}
         />
       ))}
 

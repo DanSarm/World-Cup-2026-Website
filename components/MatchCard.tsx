@@ -14,7 +14,7 @@ import { isMatchLive } from "@/lib/matchLive";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
-import { hasAnyBonus } from "@/lib/matchBonuses";
+import { hasAnyBonus, outcomePreviewLabel } from "@/lib/matchBonuses";
 import { MatchOddsBar } from "./MatchOddsBar";
 import { PickCountdownBadge } from "./PickCountdown";
 import { PickLockButton } from "./PickLockButton";
@@ -141,7 +141,7 @@ export function MatchCard({
     setWinnerId(teamId);
   }
 
-  const exactPointsPreview = useMemo(() => {
+  const pickRewardsPreview = useMemo(() => {
     if (!match.home_team_id || !match.away_team_id) return null;
     if (match.status === "final") return null;
 
@@ -164,19 +164,31 @@ export function MatchCard({
 
     if (isKO && predHome === predAway && !predWinner) return null;
 
-    return previewPickRewards(
+    const rewards = previewPickRewards(
       match,
       predHome,
       predAway,
       scoringConfig,
       predWinner
-    ).maxPoints;
+    );
+
+    return {
+      exactPoints: rewards.maxPoints,
+      outcomePoints: rewards.resultOnlyPoints,
+      outcomeLabel: outcomePreviewLabel(
+        match,
+        predHome,
+        predAway,
+        predWinner
+      ),
+    };
   }, [
     match,
     pickable,
     effectivePrediction,
     homeScore,
     awayScore,
+    winnerId,
     isKO,
     scoringConfig,
   ]);
@@ -237,8 +249,8 @@ export function MatchCard({
 
       <MatchOddsBar match={match} />
 
-      {(hasAnyBonus(match) || exactPointsPreview != null || mostPickedScore) && (
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+      {(hasAnyBonus(match) || pickRewardsPreview != null || mostPickedScore) && (
+        <div className="flex items-end flex-wrap gap-x-3 gap-y-2">
           {mostPickedScore && (
             <div
               className="leading-tight shrink-0"
@@ -257,9 +269,11 @@ export function MatchCard({
             </div>
           )}
           <MatchBonusPills match={match} />
-          {exactPointsPreview != null && (
-            <PickPointsPreview
-              points={exactPointsPreview}
+          {pickRewardsPreview != null && (
+            <PickRewardsPreview
+              outcomePoints={pickRewardsPreview.outcomePoints}
+              outcomeLabel={pickRewardsPreview.outcomeLabel}
+              exactPoints={pickRewardsPreview.exactPoints}
               className="ml-auto shrink-0"
             />
           )}
@@ -374,24 +388,41 @@ export function MatchCard({
   );
 }
 
-function PickPointsPreview({
-  points,
+function PickRewardsPreview({
+  outcomePoints,
+  outcomeLabel,
+  exactPoints,
   className = "",
 }: {
-  points: number;
+  outcomePoints: number;
+  outcomeLabel: string;
+  exactPoints: number;
   className?: string;
 }) {
   return (
-    <div
-      className={`text-right leading-tight ${className}`}
-      title="Max points if your exact score is correct"
-    >
-      <span className="text-base font-extrabold text-mexico tabular-nums">
-        +{points}
-      </span>
-      <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
-        if exact
-      </span>
+    <div className={`flex items-end gap-3 ${className}`}>
+      <div
+        className="text-right leading-tight"
+        title={`${outcomePoints} pts if the result matches your pick but the score is wrong`}
+      >
+        <span className="text-base font-extrabold text-usa tabular-nums">
+          +{outcomePoints}
+        </span>
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint max-w-[6.5rem] truncate">
+          {outcomeLabel}
+        </span>
+      </div>
+      <div
+        className="text-right leading-tight"
+        title={`${exactPoints} pts if your exact score is correct`}
+      >
+        <span className="text-base font-extrabold text-mexico tabular-nums">
+          +{exactPoints}
+        </span>
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+          if exact
+        </span>
+      </div>
     </div>
   );
 }

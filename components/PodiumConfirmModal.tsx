@@ -1,5 +1,6 @@
 "use client";
 
+import { PlaceMedal, type PlaceTier } from "./PlaceMedal";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import type { Team } from "@/lib/types";
@@ -12,7 +13,7 @@ export function PodiumConfirmModal({
   onCancel,
 }: {
   open: boolean;
-  picks: { medal: string; label: string; team: Team; maxPoints: number }[];
+  picks: { tier: PlaceTier; label: string; team: Team; maxPoints: number }[];
   pending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -51,9 +52,11 @@ export function PodiumConfirmModal({
         </div>
 
         <div className="rounded-xl bg-cream/80 border border-ink/5 divide-y divide-ink/5 overflow-hidden">
-          {picks.map(({ medal, label, team, maxPoints }) => (
+          {picks.map(({ tier, label, team, maxPoints }) => (
             <div key={label} className="flex items-center gap-3 px-3 py-2.5">
-              <span className="text-lg w-7 text-center shrink-0">{medal}</span>
+              <span className="w-7 shrink-0 flex items-center justify-center">
+                <PlaceMedal tier={tier} trophySize="compact" />
+              </span>
               <TeamFlag team={team} size="sm" />
               <div className="min-w-0 flex-1">
                 <TeamCode code={team.fifa_code} className="!text-sm text-ink" />

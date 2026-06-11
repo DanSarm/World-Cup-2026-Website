@@ -10,6 +10,7 @@ import { calculateTeamTournamentValue } from "@/lib/tournamentValue";
 import { isPodiumIncomplete } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { PickCountdownBadge } from "./PickCountdown";
+import { PlaceMedal } from "./PlaceMedal";
 import { UrgentPill } from "./UrgentPill";
 import type { Team, TournamentPodiumPrediction } from "@/lib/types";
 
@@ -29,7 +30,6 @@ const PLACES = [
   {
     key: "firstPlaceTeamId",
     label: "Champion",
-    medal: "🥇",
     field: "first_place_team_id" as const,
     tier: "first" as const,
     flagSize: "lg" as FlagSize,
@@ -37,7 +37,6 @@ const PLACES = [
   {
     key: "secondPlaceTeamId",
     label: "Runner-up",
-    medal: "🥈",
     field: "second_place_team_id" as const,
     tier: "second" as const,
     flagSize: "md" as FlagSize,
@@ -45,7 +44,6 @@ const PLACES = [
   {
     key: "thirdPlaceTeamId",
     label: "Third Place",
-    medal: "🥉",
     field: "third_place_team_id" as const,
     tier: "third" as const,
     flagSize: "sm" as FlagSize,
@@ -352,7 +350,7 @@ function PodiumPlaceRow({
       <span
         className={`home-podium-place-medal home-podium-place-medal--${place.tier}`}
       >
-        {place.medal}
+        <PlaceMedal tier={place.tier} trophySize="podium" />
       </span>
 
       <div className="home-podium-place-flag">

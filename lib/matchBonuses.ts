@@ -57,6 +57,33 @@ function shortLabel(shortName?: string, fallback?: string): string {
   return name.length > 14 ? name.slice(0, 12) + "…" : name;
 }
 
+/** Label for outcome-only points on the pick card (e.g. "if MEX wins"). */
+export function outcomePreviewLabel(
+  match: Match,
+  predHome: number,
+  predAway: number,
+  predWinnerTeamId?: string | null
+): string {
+  if (isKnockoutStage(match.stage)) {
+    if (predHome === predAway) {
+      const team =
+        predWinnerTeamId === match.home_team_id
+          ? match.home_team
+          : predWinnerTeamId === match.away_team_id
+            ? match.away_team
+            : null;
+      const code = team?.fifa_code ?? "team";
+      return `if ${code} advances`;
+    }
+    const team = predHome > predAway ? match.home_team : match.away_team;
+    return `if ${team?.fifa_code ?? "winner"} advances`;
+  }
+
+  if (predHome === predAway) return "if draw";
+  const team = predHome > predAway ? match.home_team : match.away_team;
+  return `if ${team?.fifa_code ?? "winner"} wins`;
+}
+
 export const BONUS_ADMIN_GUIDE = [
   { label: "Even match", home: 0, draw: 0, away: 0, homeAdv: 0, awayAdv: 0 },
   { label: "Sneaky pick", home: 0, draw: 1, away: 1, homeAdv: 0, awayAdv: 1 },

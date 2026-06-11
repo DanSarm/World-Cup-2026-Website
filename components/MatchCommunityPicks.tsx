@@ -52,6 +52,28 @@ function maxPointsIfCorrect(
   ).maxPoints;
 }
 
+function PicksParticipationLabel({
+  predictedCount,
+  totalPlayers,
+  compact = false,
+}: {
+  predictedCount: number;
+  totalPlayers: number;
+  compact?: boolean;
+}) {
+  if (totalPlayers <= 0) return null;
+  return (
+    <span
+      className={`font-semibold tabular-nums text-ink-faint normal-case tracking-normal ${
+        compact ? "text-[10px]" : "text-xs"
+      }`}
+      title={`${predictedCount} of ${totalPlayers} players have locked a pick`}
+    >
+      {predictedCount}/{totalPlayers} picked
+    </span>
+  );
+}
+
 export function MatchCommunityPicks({
   match,
   picks,
@@ -59,6 +81,7 @@ export function MatchCommunityPicks({
   embedded = false,
   scoringConfig = DEFAULT_SCORING_CONFIG,
   showLivePoints = false,
+  totalPlayers,
 }: {
   match: Match;
   picks: CommunityMatchPick[];
@@ -66,6 +89,8 @@ export function MatchCommunityPicks({
   embedded?: boolean;
   scoringConfig?: ScoringConfig;
   showLivePoints?: boolean;
+  /** Registered players in the pool — for X/Y picked label. */
+  totalPlayers?: number;
 }) {
   // Identical predictions always sit next to each other: group rows by
   // predicted score (and KO winner pick), rank groups by their best points.
@@ -183,13 +208,25 @@ export function MatchCommunityPicks({
     </>
   );
 
+  const participation =
+    totalPlayers != null ? (
+      <PicksParticipationLabel
+        predictedCount={picks.length}
+        totalPlayers={totalPlayers}
+        compact={embedded}
+      />
+    ) : null;
+
   if (embedded) {
     return (
       <div className="border-t border-ink/8 bg-cream/20">
         <div className="px-4 py-3 border-b border-ink/5">
-          <h3 className="text-xs font-bold text-ink-muted uppercase tracking-wide">
-            Everyone&apos;s picks
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-bold text-ink-muted uppercase tracking-wide">
+              Everyone&apos;s picks
+            </h3>
+            {participation}
+          </div>
         </div>
         {content}
       </div>
@@ -199,9 +236,12 @@ export function MatchCommunityPicks({
   return (
     <div className="card p-0 overflow-hidden">
       <div className="px-4 py-3 border-b border-ink/5">
-        <h3 className="text-sm font-bold text-usa uppercase tracking-wide">
-          Everyone&apos;s picks
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-usa uppercase tracking-wide">
+            Everyone&apos;s picks
+          </h3>
+          {participation}
+        </div>
         <p className="text-xs text-ink-muted mt-0.5">
           What the group is predicting for this match
         </p>

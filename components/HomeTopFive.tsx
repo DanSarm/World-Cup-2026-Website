@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/payouts";
 import { mergeLeaderboard, useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
+import { RankMedal } from "./PlaceMedal";
 
 interface HomeTopFiveProps {
   initialEntries: LeaderboardEntry[];
@@ -85,13 +86,11 @@ export function HomeTopFive({
           return (
             <div key={entry.playerId} className="lb-row lb-row--compact">
               <span className="lb-row-rank">
-                {entry.rank === 1
-                  ? "🥇"
-                  : entry.rank === 2
-                    ? "🥈"
-                    : entry.rank === 3
-                      ? "🥉"
-                      : entry.rank}
+                {entry.rank <= 3 ? (
+                  <RankMedal rank={entry.rank} trophySize="compact" />
+                ) : (
+                  entry.rank
+                )}
               </span>
               <span className="lb-row-main">
                 <PlayerPodiumFlags

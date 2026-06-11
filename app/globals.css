@@ -505,6 +505,10 @@ body {
   @apply min-w-0 truncate;
 }
 
+.lb-entry-paid-mark {
+  @apply shrink-0 text-[11px] font-bold leading-none text-mexico/45;
+}
+
 .lb-entry--first .lb-entry-name {
   @apply text-lg font-extrabold tracking-tight;
 }
@@ -871,6 +875,44 @@ body {
 .home-podium-place-medal {
   @apply text-center shrink-0 leading-none;
   width: 2.5rem;
+}
+
+.place-medal-trophy {
+  object-fit: contain;
+  display: block;
+  margin-inline: auto;
+}
+
+.place-medal-trophy--podium {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.place-medal-trophy--leaderboard {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+.place-medal-trophy--leaderboardHero {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.place-medal-trophy--compact {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+@media (min-width: 640px) {
+  .place-medal-trophy--podium {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .place-medal-trophy--leaderboardHero {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 
 .home-podium-place-medal--first {

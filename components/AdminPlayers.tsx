@@ -3,6 +3,7 @@
 
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import {
 
@@ -20,6 +21,7 @@ import type { Player } from "@/lib/types";
 
 export function AdminPlayers({ players }: { players: Player[] }) {
 
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const [adjustPlayer, setAdjustPlayer] = useState<string | null>(null);
@@ -33,6 +35,8 @@ export function AdminPlayers({ players }: { players: Player[] }) {
     startTransition(async () => {
 
       await adminTogglePaidAction(id, !paid);
+
+      router.refresh();
 
     });
 
@@ -106,7 +110,7 @@ export function AdminPlayers({ players }: { players: Player[] }) {
 
             >
 
-              {p.paid ? "Paid ✅" : "Unpaid"}
+              {p.paid ? "Remove from pool" : "Mark paid"}
 
             </button>
 

@@ -23,6 +23,7 @@ interface HomeFeaturedMatchSectionProps {
   scoringConfig: ScoringConfig;
   /** Override section heading (e.g. "Next game", "Up next"). */
   sectionLabel?: string;
+  totalPlayers?: number;
 }
 
 export function HomeFeaturedMatchSection({
@@ -32,6 +33,7 @@ export function HomeFeaturedMatchSection({
   currentPlayerId,
   scoringConfig,
   sectionLabel,
+  totalPlayers,
 }: HomeFeaturedMatchSectionProps) {
   const pollLive =
     isMatchLive(initialMatch) || isMatchInPlayWindow(initialMatch);
@@ -99,6 +101,7 @@ export function HomeFeaturedMatchSection({
         scoringConfig={scoringConfig}
         embedded
         showLivePoints={isLive}
+        totalPlayers={totalPlayers}
       />
     </section>
   );

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import type { LeaderboardEntry } from "@/lib/types";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
 import { formatMoney } from "@/lib/payouts";
+import { RankMedal } from "./PlaceMedal";
 
 import { type LeaderboardFilter } from "@/lib/leaderboardFilter";
 
@@ -21,16 +21,18 @@ export function LeaderboardTable({
   onFilterChange,
   hasLiveScoring = false,
 }: LeaderboardTableProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  const shown = expanded ? entries : entries.slice(0, 10);
-  const podiumEntries = shown.filter((entry) => entry.rank <= 3);
-  const restEntries = shown.filter((entry) => entry.rank > 3);
+  const podiumEntries = entries.filter((entry) => entry.rank <= 3);
+  const restEntries = entries.filter((entry) => entry.rank > 3);
 
   const rankDisplay = (rank: number) => {
-    if (rank === 1) return "🥇";
-    if (rank === 2) return "🥈";
-    if (rank === 3) return "🥉";
+    if (rank <= 3) {
+      return (
+        <RankMedal
+          rank={rank}
+          trophySize={rank === 1 ? "leaderboardHero" : "leaderboard"}
+        />
+      );
+    }
     return rank;
   };
 
@@ -92,6 +94,15 @@ export function LeaderboardTable({
               className="lb-entry-flags !w-auto"
             />
             <span className="lb-entry-name-text">{entry.displayName}</span>
+            {filter === "everyone" && entry.paid && (
+              <span
+                className="lb-entry-paid-mark"
+                title="In the prize pool"
+                aria-label="Paid — in the prize pool"
+              >
+                $
+              </span>
+            )}
           </p>
           <p className="lb-entry-meta">
             {entry.picksMade} {entry.picksMade === 1 ? "pick" : "picks"}
@@ -176,15 +187,6 @@ export function LeaderboardTable({
         </p>
       )}
 
-      {entries.length > 10 && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="w-full py-3.5 text-sm text-usa font-semibold hover:bg-cream/80 transition-colors border-t border-ink/5"
-          type="button"
-        >
-          {expanded ? "Show less" : `Show all ${entries.length} players`}
-        </button>
-      )}
     </div>
   );
 }
