@@ -44,6 +44,7 @@ export async function GET() {
         playerId: entry.playerId,
         displayName: entry.displayName,
         avatarEmoji: entry.avatarEmoji,
+        paid: entry.paid,
         rank: entry.rank,
         totalPoints: entry.totalPoints,
         provisionalTotalPoints: entry.provisionalTotalPoints,

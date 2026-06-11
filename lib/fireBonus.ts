@@ -50,8 +50,8 @@ export function calculateExactScoreFireBonus({
 }
 
 export function pickPreviewLabel(possiblePoints: number): string {
-  if (possiblePoints <= 6) return "Solid pick";
-  if (possiblePoints <= 10) return "Nice pick";
-  if (possiblePoints <= 14) return "Brave pick 🔥";
+  if (possiblePoints <= 8) return "Solid pick";
+  if (possiblePoints <= 12) return "Nice pick";
+  if (possiblePoints <= 16) return "Brave pick 🔥";
   return "Miracle pick 🚀";
 }

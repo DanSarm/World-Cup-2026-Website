@@ -9,8 +9,14 @@ import { getStageLabel, isKnockoutStage } from "@/lib/types";
 import type { Match, MatchPrediction, Team } from "@/lib/types";
 import { previewPickRewards, DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/scoringConfig";
 import { scoreMatchPrediction } from "@/lib/scoring";
-import { hasSavedPick, getEffectiveMatchPrediction, usesDefaultMissingPick } from "@/lib/pickUtils";
-import { isMatchLive, hasDisplayableLiveScore } from "@/lib/matchLive";
+import { scoreError } from "@/lib/scoreCloseness";
+import { formatMatchScoreBreakdownLines } from "@/lib/scoreBreakdownDisplay";
+import { hasSavedPick, getEffectiveMatchPrediction } from "@/lib/pickUtils";
+import {
+  isMatchDecidedForScoring,
+  isMatchLive,
+  hasDisplayableLiveScore,
+} from "@/lib/matchLive";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
@@ -43,7 +49,6 @@ export function MatchCard({
 }: MatchCardProps) {
   const router = useRouter();
   const saved = hasSavedPick(prediction);
-  const isDefaultPick = usesDefaultMissingPick(match, prediction);
   const effectivePrediction = getEffectiveMatchPrediction(match, prediction);
   const [homeScore, setHomeScore] = useState<number | null>(
     saved ? (prediction?.pred_home_score ?? null) : null
@@ -144,7 +149,7 @@ export function MatchCard({
 
   const pickRewardsPreview = useMemo(() => {
     if (!match.home_team_id || !match.away_team_id) return null;
-    if (match.status === "final") return null;
+    if (isMatchDecidedForScoring(match)) return null;
 
     let predHome: number;
     let predAway: number;
@@ -198,8 +203,38 @@ export function MatchCard({
     if (!isLive || !effectivePrediction) return null;
     return scoreMatchPrediction(match, effectivePrediction, scoringConfig, {
       allowLive: true,
-    }).points;
+    });
   }, [isLive, effectivePrediction, match, scoringConfig]);
+
+  const finalScoreResult = useMemo(() => {
+    if (!isMatchDecidedForScoring(match) || !effectivePrediction) return null;
+    if (match.home_score === null || match.away_score === null) return null;
+    return scoreMatchPrediction(match, effectivePrediction, scoringConfig);
+  }, [match, effectivePrediction, scoringConfig]);
+
+  const liveBreakdownLines = useMemo(() => {
+    if (!livePointsPreview || !effectivePrediction) return null;
+    if (match.home_score === null || match.away_score === null) return null;
+    const error = scoreError(
+      effectivePrediction.pred_home_score,
+      effectivePrediction.pred_away_score,
+      match.home_score,
+      match.away_score
+    );
+    return formatMatchScoreBreakdownLines(match, livePointsPreview, error);
+  }, [livePointsPreview, effectivePrediction, match]);
+
+  const scoreBreakdownLines = useMemo(() => {
+    if (!finalScoreResult || !effectivePrediction) return null;
+    if (match.home_score === null || match.away_score === null) return null;
+    const error = scoreError(
+      effectivePrediction.pred_home_score,
+      effectivePrediction.pred_away_score,
+      match.home_score,
+      match.away_score
+    );
+    return formatMatchScoreBreakdownLines(match, finalScoreResult, error);
+  }, [finalScoreResult, effectivePrediction, match]);
 
   return (
     <article
@@ -297,44 +332,47 @@ export function MatchCard({
               </p>
             )}
           </div>
-          {(saved || isDefaultPick) && effectivePrediction && (
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <p className="text-ink-muted">
-                Your pick:{" "}
-                <span className="font-bold text-ink tabular-nums">
-                  {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
-                </span>
-                {isDefaultPick && (
-                  <span className="text-ink-faint font-normal"> (default)</span>
-                )}
-              </p>
-              {livePointsPreview != null && (
-                <p className="font-semibold text-mexico tabular-nums">
-                  {livePointsPreview > 0
-                    ? `+${livePointsPreview} pts if it ended now`
-                    : "0 pts if it ended now"}
+          {saved && effectivePrediction && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <p className="text-ink-muted">
+                  Your pick:{" "}
+                  <span className="font-bold text-ink tabular-nums">
+                    {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
+                  </span>
                 </p>
+                {livePointsPreview != null && (
+                  <p className="font-semibold text-mexico tabular-nums">
+                    {livePointsPreview.points > 0
+                      ? `+${livePointsPreview.points} pts if it ended now`
+                      : "0 pts if it ended now"}
+                  </p>
+                )}
+              </div>
+              {liveBreakdownLines && liveBreakdownLines.length > 0 && (
+                <MatchScoreBreakdown lines={liveBreakdownLines} />
               )}
             </div>
           )}
         </div>
       )}
 
-      {match.status === "final" && match.home_score !== null && (
-        <div className="alert-info">
+      {isMatchDecidedForScoring(match) && match.home_score !== null && (
+        <div className="alert-info space-y-2">
           <div className="text-lg font-extrabold">
             Final · {match.home_score} – {match.away_score}
           </div>
-          {effectivePrediction && (
-            <p className="text-sm opacity-80 mt-1">
-              Your pick: {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
-              {isDefaultPick && (
-                <span className="opacity-70"> (default 0-0)</span>
+          {effectivePrediction ? (
+            <>
+              <p className="text-sm opacity-80">
+                Your pick: {effectivePrediction.pred_home_score}–{effectivePrediction.pred_away_score}
+              </p>
+              {scoreBreakdownLines && scoreBreakdownLines.length > 0 && (
+                <MatchScoreBreakdown lines={scoreBreakdownLines} />
               )}
-              {prediction && prediction.points > 0 && (
-                <span className="font-bold text-mexico"> · +{prediction.points} pts 🎉</span>
-              )}
-            </p>
+            </>
+          ) : (
+            <p className="text-sm opacity-80">No pick submitted — 0 pts</p>
           )}
         </div>
       )}
@@ -378,14 +416,33 @@ export function MatchCard({
       ) : lock.variant !== "final" ? (
         <div className="space-y-3">
           {error && <div className="alert-error">{error}</div>}
-          {isDefaultPick && (
+          {!saved && !pickable && (
             <p className="text-center text-sm text-ink-muted">
-              🔒 Locked — default pick 0–0
+              🔒 Locked — no pick submitted
             </p>
           )}
         </div>
       ) : null}
     </article>
+  );
+}
+
+function MatchScoreBreakdown({ lines }: { lines: string[] }) {
+  return (
+    <ul className="text-sm space-y-0.5">
+      {lines.map((line) => (
+        <li
+          key={line}
+          className={
+            line.startsWith("Total:")
+              ? "font-bold text-mexico pt-1"
+              : "text-ink-muted"
+          }
+        >
+          {line}
+        </li>
+      ))}
+    </ul>
   );
 }
 

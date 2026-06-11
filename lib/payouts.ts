@@ -1,5 +1,6 @@
 import type { LeaderboardEntry, PayoutPercentages, Settings } from "./types";
 import { getFinalsChallengeLeaderboard } from "./scoring";
+import { assignCompetitionRanks } from "./competitionRank";
 import type {
   ActualTournamentResults,
   FinalsChallengePrediction,
@@ -8,6 +9,8 @@ import type {
 
 /** Each paid player contributes this amount to the prize pool. */
 export const POOL_ENTRY_FEE = 50;
+
+export const MAX_PRIZE_RANK = 4;
 
 export function paidPayoutPercent(rank: number): number {
   switch (rank) {
@@ -40,6 +43,53 @@ export function calculatePrizeAmount(
   return Math.round(pot * (percentage / 100) * 100) / 100;
 }
 
+export interface RankedPrizeEntry {
+  playerId: string;
+  rank: number;
+}
+
+/**
+ * Only ranks 1–4 earn prize money (split among ties at each rank).
+ * If every paid player is tied for 1st, split the entire pool equally.
+ */
+export function distributeRankedPrizes(
+  rankedEntries: RankedPrizeEntry[],
+  prizePool: number
+): Map<string, number> {
+  const prizes = new Map<string, number>();
+  if (!rankedEntries.length || prizePool <= 0) return prizes;
+
+  const allTiedForFirst =
+    rankedEntries.length > 0 &&
+    rankedEntries.every((entry) => entry.rank === 1);
+
+  if (allTiedForFirst) {
+    const share = calculatePrizeAmount(
+      prizePool,
+      100 / rankedEntries.length
+    );
+    for (const entry of rankedEntries) {
+      prizes.set(entry.playerId, share);
+    }
+    return prizes;
+  }
+
+  for (let rank = 1; rank <= MAX_PRIZE_RANK; rank++) {
+    const tied = rankedEntries.filter((entry) => entry.rank === rank);
+    if (!tied.length) continue;
+
+    const poolPercent = paidPayoutPercent(rank);
+    if (poolPercent <= 0) continue;
+
+    const share = calculatePrizeAmount(prizePool, poolPercent / tied.length);
+    for (const entry of tied) {
+      prizes.set(entry.playerId, share);
+    }
+  }
+
+  return prizes;
+}
+
 export function calculateProjectedPrizes(
   leaderboard: LeaderboardEntry[],
   _finalsLeaderboard: Array<{ playerId: string; rank: number }>,
@@ -47,21 +97,15 @@ export function calculateProjectedPrizes(
   paidCount: number
 ): Map<string, number> {
   const pot = calculatePrizePool(paidCount);
-  const prizes = new Map<string, number>();
 
-  const paidLeaderboard = [...leaderboard]
-    .filter((entry) => entry.paid)
-    .sort((a, b) => b.totalPoints - a.totalPoints);
+  const paidLeaderboard = assignCompetitionRanks(
+    [...leaderboard]
+      .filter((entry) => entry.paid)
+      .sort((a, b) => b.totalPoints - a.totalPoints),
+    (entry) => entry.totalPoints
+  );
 
-  for (let rank = 1; rank <= 4; rank++) {
-    const entry = paidLeaderboard[rank - 1];
-    const percent = paidPayoutPercent(rank);
-    if (entry && percent > 0) {
-      prizes.set(entry.playerId, calculatePrizeAmount(pot, percent));
-    }
-  }
-
-  return prizes;
+  return distributeRankedPrizes(paidLeaderboard, pot);
 }
 
 export function buildProjectedPrizes(

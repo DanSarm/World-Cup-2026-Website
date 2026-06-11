@@ -64,6 +64,31 @@ export function isMatchInPlayWindow(match: LiveScoreFields): boolean {
   return now >= kickoff && now <= end;
 }
 
+/**
+ * Match has a result we should score as final — includes API "locked" rows
+ * after the in-play window when scores are set (common when sync missed finalize).
+ */
+export function isMatchDecidedForScoring(
+  match: LiveScoreFields
+): boolean {
+  if (match.status === "final") return true;
+  if (match.home_score === null || match.away_score === null) return false;
+  if (!match.kickoff_at || !match.home_team_id) return false;
+
+  const kickoff = parseISO(match.kickoff_at).getTime();
+  if (Date.now() < kickoff) return false;
+
+  if (match.status === "locked" && !isMatchInPlayWindow(match)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function shouldAutoFinalizeMatch(match: LiveScoreFields): boolean {
+  return match.status === "locked" && isMatchDecidedForScoring(match);
+}
+
 export function isAnyMatchInPlayWindow(matches: Match[]): boolean {
   return matches.some(isMatchInPlayWindow);
 }

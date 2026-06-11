@@ -46,20 +46,20 @@ export function LeaderboardTable({
   const movementDisplay = (movement?: LeaderboardEntry["rankMovement"]) => {
     if (movement === "up") {
       return (
-        <span className="block text-[9px] leading-none mt-0.5 text-mexico-light" aria-label="Moved up">
+        <span className="lb-entry-movement text-mexico-light" aria-label="Moved up">
           ▲
         </span>
       );
     }
     if (movement === "down") {
       return (
-        <span className="block text-[9px] leading-none mt-0.5 text-canada" aria-label="Moved down">
+        <span className="lb-entry-movement text-canada" aria-label="Moved down">
           ▼
         </span>
       );
     }
     return (
-      <span className="block text-[9px] leading-none mt-0.5 text-ink/20" aria-label="No change">
+      <span className="lb-entry-movement text-ink/20" aria-label="No change">
         —
       </span>
     );
@@ -81,8 +81,8 @@ export function LeaderboardTable({
             entry.rank <= 3 ? "lb-entry-rank--medal" : ""
           }`}
         >
-          <span className="block">{rankDisplay(entry.rank)}</span>
           {movementDisplay(entry.rankMovement)}
+          <span className="lb-entry-rank-value">{rankDisplay(entry.rank)}</span>
         </span>
 
         <div className="lb-entry-main min-w-0 flex-1">
@@ -118,18 +118,19 @@ export function LeaderboardTable({
         />
 
         <div className="lb-entry-score shrink-0 text-right">
-          <p className="lb-entry-score-value">{displayValue}</p>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint mt-0.5">
-            pts
-            {hasLiveScoring && (entry.livePoints ?? 0) > 0 && (
-              <span className="normal-case text-mexico font-bold">
-                {" "}
-                · +{entry.livePoints} live
-              </span>
-            )}
+          <p className="lb-entry-score-value inline-flex items-baseline justify-end gap-1">
+            <span>{displayValue}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+              pts
+            </span>
           </p>
+          {hasLiveScoring && (entry.livePoints ?? 0) > 0 && (
+            <p className="text-[10px] font-semibold text-mexico mt-0.5">
+              +{entry.livePoints} live
+            </p>
+          )}
           {filter === "paid" && entry.rank <= 4 && entry.projectedPrize > 0 && (
-            <p className="text-[11px] font-bold text-mexico tabular-nums mt-1">
+            <p className="text-[10px] font-bold text-mexico tabular-nums mt-0.5">
               {formatMoney(entry.projectedPrize)}
             </p>
           )}
@@ -140,7 +141,7 @@ export function LeaderboardTable({
 
   return (
     <div className="card p-0 overflow-hidden">
-      <div className="p-3 sm:p-4 border-b border-ink/5 space-y-3">
+      <div className="p-2.5 sm:p-3 border-b border-ink/5 space-y-2">
         {hasLiveScoring && (
           <p className="text-xs font-semibold text-canada leading-snug">
             <span className="sm:hidden">Live — totals include provisional points</span>
@@ -150,21 +151,33 @@ export function LeaderboardTable({
             </span>
           </p>
         )}
-        <div className="segmented-light">
-          <button
-            type="button"
-            onClick={() => onFilterChange("paid")}
-            className={`segment-light ${filter === "paid" ? "segment-light-active" : ""}`}
-          >
-            Paid only
-          </button>
-          <button
-            type="button"
-            onClick={() => onFilterChange("everyone")}
-            className={`segment-light ${filter === "everyone" ? "segment-light-active" : ""}`}
-          >
-            Everyone
-          </button>
+        <div className="relative z-10 space-y-2">
+          <div className="segmented-light" role="tablist" aria-label="Leaderboard view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "paid"}
+              onClick={() => onFilterChange("paid")}
+              className={`segment-light cursor-pointer ${filter === "paid" ? "segment-light-active" : ""}`}
+            >
+              Paid only
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "everyone"}
+              onClick={() => onFilterChange("everyone")}
+              className={`segment-light cursor-pointer ${filter === "everyone" ? "segment-light-active" : ""}`}
+            >
+              Everyone
+            </button>
+          </div>
+          <p className="text-[11px] text-ink-faint tabular-nums">
+            {entries.length} {entries.length === 1 ? "player" : "players"}
+            {filter === "everyone" && (
+              <span> · $ marks who is in the prize pool</span>
+            )}
+          </p>
         </div>
       </div>
 

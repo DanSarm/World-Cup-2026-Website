@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { LeaderboardTable } from "./LeaderboardTable";
-import { StatCards } from "./StatCards";
 import { PageHeader } from "./PageHeader";
 import type { LeaderboardEntry } from "@/lib/types";
 import {
@@ -10,16 +9,13 @@ import {
   type LeaderboardFilter,
 } from "@/lib/leaderboardFilter";
 import { mergeLeaderboard, useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
+import { PoolHighlightsSection } from "./PoolHighlights";
+import type { PoolHighlights } from "@/lib/poolHighlights";
 
 interface LeaderboardClientProps {
   leaderboard: LeaderboardEntry[];
   prizePool: number;
-  funStats: {
-    mostPoints: { name: string; points: number } | null;
-    mostExactScores: { name: string; count: number } | null;
-    mostMiraclePoints: { name: string; points: number } | null;
-    bestPerfectDay: { name: string; count: number } | null;
-  };
+  poolHighlights: PoolHighlights;
   pollLive?: boolean;
   initialHasLiveScoring?: boolean;
 }
@@ -27,7 +23,7 @@ interface LeaderboardClientProps {
 export function LeaderboardClient({
   leaderboard: initialLeaderboard,
   prizePool,
-  funStats,
+  poolHighlights,
   pollLive = false,
   initialHasLiveScoring = false,
 }: LeaderboardClientProps) {
@@ -46,16 +42,17 @@ export function LeaderboardClient({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
-        flags={["ARG", "FRA", "BRA", "GER"]}
         title="Leaderboard"
         subtitle={
           hasLiveScoring
-            ? "Live standings — points update with the current score"
+            ? filter === "paid"
+              ? "Live standings among players in the prize pool"
+              : "Live standings for everyone who joined"
             : filter === "paid"
               ? "Rankings among players in the prize pool"
-              : "Standings from saved picks"
+              : "Standings for everyone who joined"
         }
       />
 
@@ -66,7 +63,7 @@ export function LeaderboardClient({
         hasLiveScoring={hasLiveScoring}
       />
 
-      <StatCards {...funStats} />
+      <PoolHighlightsSection highlights={poolHighlights} />
     </div>
   );
 }

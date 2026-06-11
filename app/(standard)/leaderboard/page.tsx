@@ -3,10 +3,14 @@ import { getSession } from "@/lib/session";
 import {
   getLeaderboardData,
   getPredictions,
-  computeFunStats,
-  getPlayers,
   getMatchesWithTeams,
+  getTournamentPodiumPredictions,
+  getFinalsPredictions,
+  getAdjustments,
+  getActualResults,
+  getTeams,
 } from "@/lib/data";
+import { computePoolHighlights } from "@/lib/poolHighlights";
 import { calculatePrizePool } from "@/lib/payouts";
 import { LeaderboardClient } from "@/components/LeaderboardClient";
 import {
@@ -26,15 +30,39 @@ export default async function LeaderboardPage() {
     await syncLiveScores();
   }
 
-  const [{ leaderboard, settings, matches }, players, predictions] =
-    await Promise.all([
-      liveMatchesInitial.length > 0
-        ? getLeaderboardData({ includeLiveScores: true })
-        : getLeaderboardData(),
-      getPlayers(),
-      getPredictions(),
-    ]);
-  const funStats = computeFunStats(leaderboard, matches, predictions, settings);
+  const [
+    { leaderboard, settings, matches, players },
+    predictions,
+    podiumPredictions,
+    finalsPredictions,
+    adjustments,
+    actualResults,
+    teams,
+  ] = await Promise.all([
+    liveMatchesInitial.length > 0
+      ? getLeaderboardData({ includeLiveScores: true })
+      : getLeaderboardData(),
+    getPredictions(),
+    getTournamentPodiumPredictions(),
+    getFinalsPredictions(),
+    getAdjustments(),
+    getActualResults(),
+    getTeams(),
+  ]);
+
+  const poolHighlights = computePoolHighlights({
+    players,
+    matches,
+    predictions,
+    settings,
+    leaderboard,
+    podiumPredictions,
+    finalsPredictions,
+    adjustments,
+    actualResults,
+    teams,
+  });
+
   const paidCount = players.filter((p) => p.paid).length;
   const prizePool = calculatePrizePool(paidCount);
 
@@ -42,7 +70,7 @@ export default async function LeaderboardPage() {
     <LeaderboardClient
       leaderboard={leaderboard}
       prizePool={prizePool}
-      funStats={funStats}
+      poolHighlights={poolHighlights}
       pollLive={isAnyMatchInPlayWindow(matches)}
       initialHasLiveScoring={hasAnyDisplayableLiveScore(matches)}
     />

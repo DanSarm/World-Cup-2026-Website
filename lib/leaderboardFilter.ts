@@ -1,5 +1,6 @@
 import type { LeaderboardEntry } from "./types";
-import { calculatePrizeAmount, paidPayoutPercent } from "./payouts";
+import { distributeRankedPrizes } from "./payouts";
+import { assignCompetitionRanksImmutable } from "./competitionRank";
 
 export type LeaderboardFilter = "everyone" | "paid";
 
@@ -10,25 +11,24 @@ function entryPoints(entry: LeaderboardEntry): number {
 export function rerankLeaderboardEntries(
   entries: LeaderboardEntry[]
 ): LeaderboardEntry[] {
-  // Ties keep the server order (entry.rank), which already encodes the
-  // full tie-breakers: potential points, exact scores, etc.
-  return [...entries]
-    .sort((a, b) => entryPoints(b) - entryPoints(a) || a.rank - b.rank)
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const sorted = [...entries].sort(
+    (a, b) =>
+      entryPoints(b) - entryPoints(a) ||
+      a.displayName.localeCompare(b.displayName)
+  );
+  return assignCompetitionRanksImmutable(sorted, entryPoints);
 }
 
 export function attachPaidProjectedPrizes(
   entries: LeaderboardEntry[],
   prizePool: number
 ): LeaderboardEntry[] {
-  return entries.map((entry) => {
-    const percent = paidPayoutPercent(entry.rank);
-    return {
-      ...entry,
-      projectedPrize:
-        percent > 0 ? calculatePrizeAmount(prizePool, percent) : 0,
-    };
-  });
+  const prizes = distributeRankedPrizes(entries, prizePool);
+
+  return entries.map((entry) => ({
+    ...entry,
+    projectedPrize: prizes.get(entry.playerId) ?? 0,
+  }));
 }
 
 export function filterLeaderboard(
@@ -36,9 +36,12 @@ export function filterLeaderboard(
   filter: LeaderboardFilter,
   prizePool: number
 ): LeaderboardEntry[] {
-  if (filter === "everyone") return entries;
-  return attachPaidProjectedPrizes(
-    rerankLeaderboardEntries(entries.filter((entry) => entry.paid)),
-    prizePool
-  );
+  const source = entries.map((entry) => ({ ...entry }));
+  const subset =
+    filter === "paid" ? source.filter((entry) => entry.paid) : source;
+  const reranked = rerankLeaderboardEntries(subset);
+  if (filter === "paid") {
+    return attachPaidProjectedPrizes(reranked, prizePool);
+  }
+  return reranked;
 }

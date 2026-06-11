@@ -13,19 +13,28 @@ import type {
   TournamentPodiumPrediction,
 } from "./types";
 import { isKnockoutStage } from "./types";
-import { hasDisplayableLiveScore } from "./matchLive";
+import { assignCompetitionRanks } from "./competitionRank";
+import { hasDisplayableLiveScore, isMatchDecidedForScoring } from "./matchLive";
 import { isConfirmedPick, getEffectiveMatchPrediction } from "./pickUtils";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
   capGroupMatchPoints,
-  outcomeBonusForScoreline,
   previewPickRewards,
   scoringConfigFromSettings,
   type ScoringConfig,
   DEFAULT_SCORING_CONFIG,
 } from "./scoringConfig";
+import {
+  closenessBonus,
+  EXACT_SCORE_BONUS,
+  scoreError,
+} from "./scoreCloseness";
 import { championProbabilityToLongshotBonus } from "./odds/math";
-import { tournamentPlacePoints } from "./tournamentValue";
+import {
+  calculateTeamTournamentValue,
+  tournamentPlacePoints,
+} from "./tournamentValue";
+import { matchDateKey } from "./utils";
 
 function getKnockoutAdvancePoints(stage: MatchStage): number {
   const map: Partial<Record<MatchStage, number>> = {
@@ -65,7 +74,7 @@ export interface ScoreMatchResult {
 export interface ScoreBreakdown {
   basePoints: number;
   exactScoreBonus: number;
-  marginBonus: number;
+  scoreClosenessBonus: number;
   outcomeBonus: number;
   fireBonus: number;
   perfectDayBonus: number;
@@ -107,6 +116,7 @@ export function scoreMatchPrediction(
     | "home_team_id"
     | "away_team_id"
     | "status"
+    | "kickoff_at"
     | "home_win_bonus"
     | "draw_bonus"
     | "away_win_bonus"
@@ -123,7 +133,7 @@ export function scoreMatchPrediction(
   const emptyBreakdown: ScoreBreakdown = {
     basePoints: 0,
     exactScoreBonus: 0,
-    marginBonus: 0,
+    scoreClosenessBonus: 0,
     outcomeBonus: 0,
     fireBonus: 0,
     perfectDayBonus: 0,
@@ -142,11 +152,8 @@ export function scoreMatchPrediction(
 
   const allowLive = options?.allowLive === true;
   const scoreable =
-    match.status === "final" ||
-    (allowLive &&
-      match.home_score !== null &&
-      match.away_score !== null &&
-      (match.status === "live" || match.status === "locked"));
+    isMatchDecidedForScoring(match) ||
+    (allowLive && hasDisplayableLiveScore(match));
 
   if (
     !scoreable ||
@@ -162,6 +169,7 @@ export function scoreMatchPrediction(
   const predAway = prediction.pred_away_score;
 
   const exact = predHome === actualHome && predAway === actualAway;
+  const error = scoreError(predHome, predAway, actualHome, actualAway);
 
   if (isKnockoutStage(match.stage)) {
     const actualWinner =
@@ -175,51 +183,45 @@ export function scoreMatchPrediction(
     const knockoutCorrect =
       !!actualWinner && prediction.pred_winner_team_id === actualWinner;
 
-    let points = 0;
-    let outcomeBonus = 0;
-    let basePoints = 0;
-    let exactScoreBonus = 0;
-    let fireBonus = 0;
-
-    if (knockoutCorrect) {
-      basePoints = getKnockoutAdvancePoints(match.stage);
-      outcomeBonus = knockoutAdvanceBonus(match, actualWinner);
-      points += basePoints + outcomeBonus;
+    if (!knockoutCorrect) {
+      return empty;
     }
 
-    if (exact) {
-      exactScoreBonus = 3;
+    const basePoints = getKnockoutAdvancePoints(match.stage);
+    const outcomeBonus = knockoutAdvanceBonus(match, actualWinner);
+    let exactScoreBonus = 0;
+    let scoreClosenessBonus = 0;
+    let fireBonus = 0;
+    let points = basePoints + outcomeBonus;
+
+    if (error === 0) {
+      exactScoreBonus = EXACT_SCORE_BONUS;
       points += exactScoreBonus;
-      const bonusForFire = knockoutCorrect
-        ? outcomeBonus
-        : outcomeBonusForScoreline(
-            match,
-            predHome,
-            predAway,
-            prediction.pred_winner_team_id
-          );
       fireBonus = calculateExactScoreFireBonus({
         isExactScore: true,
         isDraw: actualHome === actualAway,
         totalGoals: actualHome + actualAway,
         winningMargin: getMargin(actualHome, actualAway),
-        outcomeBonus: bonusForFire,
+        outcomeBonus,
         enabled: scoringConfig.exactScoreFireBonusEnabled,
       });
       points += fireBonus;
+    } else {
+      scoreClosenessBonus = closenessBonus(error);
+      points += scoreClosenessBonus;
     }
 
     return {
       points,
       exactScore: exact,
-      correctResult: knockoutCorrect,
-      knockoutCorrect,
+      correctResult: true,
+      knockoutCorrect: true,
       outcomeBonus,
       fireBonus,
       breakdown: {
         basePoints,
         exactScoreBonus,
-        marginBonus: 0,
+        scoreClosenessBonus,
         outcomeBonus,
         fireBonus,
         perfectDayBonus: 0,
@@ -239,12 +241,12 @@ export function scoreMatchPrediction(
   const outcomeBonus = groupOutcomeBonus(match, actualResult);
   const basePoints = 3;
   let exactScoreBonus = 0;
-  let marginBonus = 0;
+  let scoreClosenessBonus = 0;
   let fireBonus = 0;
   let points = basePoints + outcomeBonus;
 
-  if (exact) {
-    exactScoreBonus = 3;
+  if (error === 0) {
+    exactScoreBonus = EXACT_SCORE_BONUS;
     points += exactScoreBonus;
     fireBonus = calculateExactScoreFireBonus({
       isExactScore: true,
@@ -255,13 +257,9 @@ export function scoreMatchPrediction(
       enabled: scoringConfig.exactScoreFireBonusEnabled,
     });
     points += fireBonus;
-  } else if (actualResult !== "draw") {
-    const actualMargin = getMargin(actualHome, actualAway);
-    const predMargin = getMargin(predHome, predAway);
-    if (actualMargin === predMargin) {
-      marginBonus = 1;
-      points += marginBonus;
-    }
+  } else {
+    scoreClosenessBonus = closenessBonus(error);
+    points += scoreClosenessBonus;
   }
 
   points = capGroupMatchPoints(points, scoringConfig);
@@ -276,7 +274,7 @@ export function scoreMatchPrediction(
     breakdown: {
       basePoints,
       exactScoreBonus,
-      marginBonus,
+      scoreClosenessBonus,
       outcomeBonus,
       fireBonus,
       perfectDayBonus: 0,
@@ -294,11 +292,11 @@ export function calculatePerfectDayBonuses(
   const bonuses = new Map<string, number>();
   if (!scoringConfig.perfectDayBonusEnabled) return bonuses;
 
-  const finalMatches = matches.filter((m) => m.status === "final");
+  const finalMatches = matches.filter((m) => isMatchDecidedForScoring(m));
   const byDate = new Map<string, Match[]>();
   for (const m of finalMatches) {
-    if (!m.kickoff_at) continue;
-    const date = m.kickoff_at.slice(0, 10);
+    const date = matchDateKey(m.kickoff_at);
+    if (!date) continue;
     const list = byDate.get(date) ?? [];
     list.push(m);
     byDate.set(date, list);
@@ -320,12 +318,11 @@ export function calculatePerfectDayBonuses(
 
       for (const m of dayMatches) {
         const pred = predByPlayerMatch.get(`${playerId}:${m.id}`);
-        const effective = getEffectiveMatchPrediction(m, pred);
-        if (!effective) {
+        if (!pred) {
           allPicked = false;
           break;
         }
-        const result = scoreMatchPrediction(m, effective, scoringConfig);
+        const result = scoreMatchPrediction(m, pred, scoringConfig);
         if (!result.correctResult) {
           allCorrect = false;
           break;
@@ -333,9 +330,10 @@ export function calculatePerfectDayBonuses(
       }
 
       if (allPicked && allCorrect) {
+        const dayBonus = Math.min(dayMatches.length, 5);
         bonuses.set(
           playerId,
-          (bonuses.get(playerId) ?? 0) + scoringConfig.perfectDayBonusPoints
+          (bonuses.get(playerId) ?? 0) + dayBonus
         );
       }
     }
@@ -409,9 +407,43 @@ export interface TournamentPickPointsBreakdown {
   thirdPlace: number;
 }
 
+type PodiumPickSlot = "champion" | "runnerUp" | "thirdPlace";
+type ActualPodiumFinish = "champion" | "runnerUp" | "thirdPlace";
+
+const PODIUM_PARTIAL_CREDIT: Record<
+  PodiumPickSlot,
+  Record<ActualPodiumFinish, number>
+> = {
+  champion: { champion: 1, runnerUp: 0.35, thirdPlace: 0.2 },
+  runnerUp: { champion: 0.25, runnerUp: 0.45, thirdPlace: 0.2 },
+  thirdPlace: { champion: 0.15, runnerUp: 0.15, thirdPlace: 0.3 },
+};
+
+function podiumSlotPoints(
+  pickedTeamId: string | null,
+  slot: PodiumPickSlot,
+  actualResults: ActualTournamentResults,
+  teamsById: Map<string, Team>
+): number {
+  if (!pickedTeamId) return 0;
+  const value = calculateTeamTournamentValue(teamsById.get(pickedTeamId));
+  if (value <= 0) return 0;
+
+  const credits = PODIUM_PARTIAL_CREDIT[slot];
+  if (actualResults.champion === pickedTeamId) {
+    return Math.round(value * credits.champion);
+  }
+  if (actualResults.runner_up === pickedTeamId) {
+    return Math.round(value * credits.runnerUp);
+  }
+  if (actualResults.third_place === pickedTeamId) {
+    return Math.round(value * credits.thirdPlace);
+  }
+  return 0;
+}
+
 /**
- * Tournament Picks scoring: dynamic points from each team's
- * pre-tournament market win %. Only the exact position counts.
+ * Tournament Picks scoring: market-based team value with podium partial credit.
  */
 export function calculatePodiumPoints(
   podium: Pick<
@@ -421,39 +453,24 @@ export function calculatePodiumPoints(
   actualResults: ActualTournamentResults,
   teamsById: Map<string, Team>
 ): TournamentPickPointsBreakdown {
-  let champion = 0;
-  let runnerUp = 0;
-  let thirdPlace = 0;
-
-  if (
-    podium.first_place_team_id &&
-    actualResults.champion === podium.first_place_team_id
-  ) {
-    champion = tournamentPlacePoints(
-      teamsById.get(podium.first_place_team_id),
-      "champion"
-    );
-  }
-
-  if (
-    podium.second_place_team_id &&
-    actualResults.runner_up === podium.second_place_team_id
-  ) {
-    runnerUp = tournamentPlacePoints(
-      teamsById.get(podium.second_place_team_id),
-      "runnerUp"
-    );
-  }
-
-  if (
-    podium.third_place_team_id &&
-    actualResults.third_place === podium.third_place_team_id
-  ) {
-    thirdPlace = tournamentPlacePoints(
-      teamsById.get(podium.third_place_team_id),
-      "thirdPlace"
-    );
-  }
+  const champion = podiumSlotPoints(
+    podium.first_place_team_id,
+    "champion",
+    actualResults,
+    teamsById
+  );
+  const runnerUp = podiumSlotPoints(
+    podium.second_place_team_id,
+    "runnerUp",
+    actualResults,
+    teamsById
+  );
+  const thirdPlace = podiumSlotPoints(
+    podium.third_place_team_id,
+    "thirdPlace",
+    actualResults,
+    teamsById
+  );
 
   return {
     total: champion + runnerUp + thirdPlace,
@@ -579,7 +596,7 @@ export function calculateLeaderboard(
       const effective = getEffectiveMatchPrediction(match, pred);
       if (!effective) continue;
 
-      if (match.status !== "final") {
+      if (!isMatchDecidedForScoring(match)) {
         potentialPoints += previewPickRewards(
           match,
           effective.pred_home_score,
@@ -589,7 +606,7 @@ export function calculateLeaderboard(
         ).maxPoints;
       }
 
-      if (match.status === "final") {
+      if (isMatchDecidedForScoring(match)) {
         const result = scoreMatchPrediction(match, effective, scoringConfig);
         matchPoints += result.points;
         if (match.stage === "group") {
@@ -651,7 +668,7 @@ export function calculateLeaderboard(
     const provisionalTotalPoints = totalPoints + livePoints;
 
     let closestFinalScoreDiff: number | null = null;
-    if (finalMatch?.status === "final" && finalMatch.home_score !== null) {
+    if (finalMatch && isMatchDecidedForScoring(finalMatch) && finalMatch.home_score !== null) {
       const finalPred = getEffectiveMatchPrediction(
         finalMatch,
         predByMatchId.get(finalMatch.id)
@@ -716,9 +733,7 @@ export function calculateLeaderboard(
     return compareTieBreakers(a, b);
   });
 
-  entries.forEach((e, i) => {
-    e.rank = i + 1;
-  });
+  assignCompetitionRanks(entries, sortPoints);
 
   return entries;
 }
@@ -767,7 +782,9 @@ export function getFinalsChallengeLeaderboard(
     return 0;
   });
 
-  return rows.map((r, i) => ({ ...r, rank: i + 1 }));
+  assignCompetitionRanks(rows, (r) => r.points);
+
+  return rows;
 }
 
 export function countPerfectDays(
@@ -778,11 +795,11 @@ export function countPerfectDays(
 ): number {
   if (!scoringConfig.perfectDayBonusEnabled) return 0;
 
-  const finalMatches = matches.filter((m) => m.status === "final");
+  const finalMatches = matches.filter((m) => isMatchDecidedForScoring(m));
   const byDate = new Map<string, Match[]>();
   for (const m of finalMatches) {
-    if (!m.kickoff_at) continue;
-    const date = m.kickoff_at.slice(0, 10);
+    const date = matchDateKey(m.kickoff_at);
+    if (!date) continue;
     const list = byDate.get(date) ?? [];
     list.push(m);
     byDate.set(date, list);
@@ -795,7 +812,10 @@ export function countPerfectDays(
     let allPicked = true;
     for (const m of dayMatches) {
       const pred = predictions.find(
-        (p) => p.player_id === playerId && p.match_id === m.id
+        (p) =>
+          p.player_id === playerId &&
+          p.match_id === m.id &&
+          isConfirmedPick(p)
       );
       if (!pred) {
         allPicked = false;

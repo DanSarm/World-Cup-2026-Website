@@ -10,7 +10,6 @@ import {
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
 import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { resolveMatchesForPicks } from "@/lib/resolvedMatches";
-import { ensureDefaultPredictionsForPlayer } from "@/lib/defaultPredictions";
 import { PicksClient } from "@/components/PicksClient";
 
 export default async function PicksPage() {
@@ -24,9 +23,7 @@ export default async function PicksPage() {
     getMyTournamentPodium(session.id),
   ]);
 
-  let predictions = await getPredictions(session.id);
-  await ensureDefaultPredictionsForPlayer(session.id, matches, predictions);
-  predictions = await getPredictions(session.id);
+  const predictions = await getPredictions(session.id);
 
   const scoringConfig = scoringConfigFromSettings(settings);
   const podiumLocked = isTournamentPodiumLocked(settings, matches);

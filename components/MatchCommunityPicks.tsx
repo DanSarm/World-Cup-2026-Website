@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
 import { hasDisplayableLiveScore } from "@/lib/matchLive";
 import type { CommunityMatchPick } from "@/lib/data";
 import {
@@ -80,6 +83,78 @@ function PicksParticipationLabel({
   );
 }
 
+function CollapseChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-4 h-4 shrink-0 text-ink-faint transition-transform duration-200 ${
+        expanded ? "rotate-180" : ""
+      }`}
+      aria-hidden
+    >
+      <path
+        fill="currentColor"
+        d="M4.5 6.25 8 9.75l3.5-3.5.708.708L8 11.167 3.792 6.958z"
+      />
+    </svg>
+  );
+}
+
+function CommunityPicksHeader({
+  embedded,
+  expanded,
+  onToggle,
+  participation,
+  pickCount,
+}: {
+  embedded: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  participation: ReactNode;
+  pickCount: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className={`w-full text-left px-4 py-3 border-b border-ink/5 hover:bg-ink/[0.03] transition-colors ${
+        expanded ? "" : "border-b-0"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <h3
+            className={`font-bold uppercase tracking-wide shrink-0 ${
+              embedded
+                ? "text-xs text-ink-muted"
+                : "text-sm text-usa"
+            }`}
+          >
+            Everyone&apos;s picks
+          </h3>
+          {!expanded && pickCount > 0 && (
+            <span className="text-[10px] font-semibold text-ink-faint normal-case tracking-normal truncate">
+              {pickCount} {pickCount === 1 ? "pick" : "picks"}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {participation}
+          <CollapseChevron expanded={expanded} />
+        </div>
+      </div>
+      {!embedded && (
+        <p className="text-xs text-ink-muted mt-0.5">
+          {expanded
+            ? "What the group is predicting for this match"
+            : "Tap to see what everyone picked"}
+        </p>
+      )}
+    </button>
+  );
+}
+
 export function MatchCommunityPicks({
   match,
   picks,
@@ -88,6 +163,7 @@ export function MatchCommunityPicks({
   scoringConfig = DEFAULT_SCORING_CONFIG,
   showLivePoints = false,
   totalPlayers,
+  defaultExpanded = false,
 }: {
   match: Match;
   picks: CommunityMatchPick[];
@@ -97,7 +173,10 @@ export function MatchCommunityPicks({
   showLivePoints?: boolean;
   /** Registered players in the pool — for X/Y picked label. */
   totalPlayers?: number;
+  /** Start with the pick list collapsed (header stays visible). */
+  defaultExpanded?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   // Identical predictions always sit next to each other: group rows by
   // predicted score (and KO winner pick), rank groups by their best points.
   const scoreKey = (pick: CommunityMatchPick) =>
@@ -115,8 +194,17 @@ export function MatchCommunityPicks({
 
   const showingLiveScore = hasDisplayableLiveScore(match);
 
+  const isPickExactRightNow = (pick: CommunityMatchPick) =>
+    showingLiveScore &&
+    match.home_score === pick.predHomeScore &&
+    match.away_score === pick.predAwayScore;
+
   const sortedPicks = [...picks].sort((a, b) => {
     if (showingLiveScore) {
+      const aExact = isPickExactRightNow(a);
+      const bExact = isPickExactRightNow(b);
+      if (aExact !== bExact) return aExact ? -1 : 1;
+
       const pickPrediction = (pick: CommunityMatchPick) => ({
         pred_home_score: pick.predHomeScore,
         pred_away_score: pick.predAwayScore,
@@ -161,10 +249,7 @@ export function MatchCommunityPicks({
             isLive && isPickLiveEliminated(match, pickPrediction, scoringConfig);
           const exactImpossible =
             isLive && isPickExactImpossible(match, pick);
-          const exactRightNow =
-            isLive &&
-            match.home_score === pick.predHomeScore &&
-            match.away_score === pick.predAwayScore;
+          const exactRightNow = isPickExactRightNow(pick);
           const rowStateClass = exactRightNow
             ? "bg-mexico/10"
             : liveEliminated || exactImpossible
@@ -248,33 +333,28 @@ export function MatchCommunityPicks({
   if (embedded) {
     return (
       <div className="border-t border-ink/8 bg-cream/20">
-        <div className="px-4 py-3 border-b border-ink/5">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-bold text-ink-muted uppercase tracking-wide">
-              Everyone&apos;s picks
-            </h3>
-            {participation}
-          </div>
-        </div>
-        {content}
+        <CommunityPicksHeader
+          embedded
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+          participation={participation}
+          pickCount={picks.length}
+        />
+        {expanded && content}
       </div>
     );
   }
 
   return (
     <div className="card p-0 overflow-hidden">
-      <div className="px-4 py-3 border-b border-ink/5">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold text-usa uppercase tracking-wide">
-            Everyone&apos;s picks
-          </h3>
-          {participation}
-        </div>
-        <p className="text-xs text-ink-muted mt-0.5">
-          What the group is predicting for this match
-        </p>
-      </div>
-      {content}
+      <CommunityPicksHeader
+        embedded={false}
+        expanded={expanded}
+        onToggle={() => setExpanded((v) => !v)}
+        participation={participation}
+        pickCount={picks.length}
+      />
+      {expanded && content}
     </div>
   );
 }

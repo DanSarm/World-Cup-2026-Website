@@ -445,23 +445,23 @@ body {
 .lb-row:last-child { border-bottom: none; }
 
 .lb-entry {
-  @apply flex items-center gap-3 px-4 py-3.5 sm:px-5 sm:py-4;
+  @apply flex items-center gap-2.5 px-3.5 py-2.5 sm:px-4 sm:py-3;
 }
 
 .lb-entry--first {
-  @apply gap-4 py-6 sm:py-7 sm:px-6;
+  @apply gap-3 py-4 sm:py-5 sm:px-5;
 }
 
 .lb-entry--second {
-  @apply gap-4 py-5 sm:py-6 sm:px-5;
+  @apply gap-2.5 py-3.5 sm:py-4 sm:px-4;
 }
 
 .lb-entry--third {
-  @apply gap-3.5 py-4.5 sm:py-5;
+  @apply gap-2.5 py-3 sm:py-3.5;
 }
 
 .lb-podium-block {
-  @apply mx-2 sm:mx-3 my-3 rounded-xl border border-ink/10 overflow-hidden;
+  @apply mx-1.5 sm:mx-2 my-2 rounded-xl border border-ink/10 overflow-hidden;
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.04);
 }
 
@@ -478,23 +478,47 @@ body {
 }
 
 .lb-entry-rank {
-  @apply w-8 shrink-0 text-center font-bold tabular-nums text-ink-muted text-sm;
+  @apply flex items-center justify-end gap-0.5 w-11 shrink-0 font-bold tabular-nums text-ink-muted text-sm;
+}
+
+.lb-entry-movement {
+  @apply w-2.5 shrink-0 text-center text-[9px] leading-none;
+}
+
+.lb-entry-rank-value {
+  @apply shrink-0 text-center min-w-[1.25rem];
 }
 
 .lb-entry-rank--medal {
   @apply text-base;
 }
 
+.lb-entry-rank--medal .lb-entry-rank-value {
+  @apply min-w-[1.375rem];
+}
+
 .lb-entry--first .lb-entry-rank {
-  @apply w-11 text-[2.25rem] leading-none;
+  @apply w-[3.25rem] text-[1.875rem] leading-none;
+}
+
+.lb-entry--first .lb-entry-rank-value {
+  @apply min-w-[2rem];
 }
 
 .lb-entry--second .lb-entry-rank {
-  @apply w-10 text-2xl leading-none;
+  @apply w-[2.75rem] text-xl leading-none;
+}
+
+.lb-entry--second .lb-entry-rank-value {
+  @apply min-w-[1.5rem];
 }
 
 .lb-entry--third .lb-entry-rank {
-  @apply w-9 text-xl leading-none;
+  @apply w-11 text-lg leading-none;
+}
+
+.lb-entry--third .lb-entry-rank-value {
+  @apply min-w-[1.375rem];
 }
 
 .lb-entry-name {
@@ -510,31 +534,31 @@ body {
 }
 
 .lb-entry--first .lb-entry-name {
-  @apply text-lg font-extrabold tracking-tight;
+  @apply text-base sm:text-lg font-extrabold tracking-tight;
 }
 
 .lb-entry--first .lb-entry-name .inline-flex {
-  @apply text-xl;
+  @apply text-lg sm:text-xl;
 }
 
 .lb-entry--second .lb-entry-name {
-  @apply text-base font-bold;
-}
-
-.lb-entry--third .lb-entry-name {
   @apply text-[15px] font-bold;
 }
 
+.lb-entry--third .lb-entry-name {
+  @apply text-sm font-bold;
+}
+
 .lb-entry-meta {
-  @apply text-[11px] text-ink-faint mt-0.5 tabular-nums;
+  @apply text-[10px] sm:text-[11px] text-ink-faint mt-0 tabular-nums;
 }
 
 .lb-entry--first .lb-entry-meta {
-  @apply text-xs mt-1.5;
+  @apply text-[11px] sm:text-xs mt-0.5;
 }
 
 .lb-entry--second .lb-entry-meta {
-  @apply text-[11px] sm:text-xs mt-1;
+  @apply text-[10px] sm:text-[11px] mt-0.5;
 }
 
 .lb-entry--third .lb-entry-meta {
@@ -542,31 +566,31 @@ body {
 }
 
 .lb-entry-score-value {
-  @apply font-extrabold text-usa tabular-nums text-xl leading-none;
+  @apply font-extrabold text-usa tabular-nums text-lg leading-none;
 }
 
 .lb-entry--first .lb-entry-score-value {
-  @apply text-4xl font-black tracking-tight;
+  @apply text-3xl font-black tracking-tight;
 }
 
 .lb-entry--second .lb-entry-score-value {
-  @apply text-3xl font-black;
+  @apply text-2xl font-black;
 }
 
 .lb-entry--third .lb-entry-score-value {
-  @apply text-2xl font-extrabold;
+  @apply text-xl font-extrabold;
 }
 
 .lb-entry--first .lb-entry-score {
-  @apply min-w-[6rem];
+  @apply min-w-[5.25rem];
 }
 
 .lb-entry--second .lb-entry-score {
-  @apply min-w-[5.5rem];
+  @apply min-w-[4.75rem];
 }
 
 .lb-entry--third .lb-entry-score {
-  @apply min-w-[5rem];
+  @apply min-w-[4.25rem];
 }
 
 .lb-entry-main {
@@ -574,7 +598,7 @@ body {
 }
 
 .lb-entry-score {
-  @apply min-w-[4.5rem];
+  @apply min-w-[4rem];
 }
 
 /* Compact list rows (Top 5, community picks) */
@@ -894,8 +918,8 @@ body {
 }
 
 .place-medal-trophy--leaderboardHero {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2rem;
+  height: 2rem;
 }
 
 .place-medal-trophy--compact {
@@ -910,8 +934,8 @@ body {
   }
 
   .place-medal-trophy--leaderboardHero {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.125rem;
+    height: 2.125rem;
   }
 }
 
@@ -1073,8 +1097,8 @@ body {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "rank main score";
     align-items: center;
-    gap: 0.375rem 0.625rem;
-    padding: 0.75rem;
+    gap: 0.25rem 0.5rem;
+    padding: 0.625rem 0.75rem;
   }
 
   .lb-entry-rank {
@@ -1106,21 +1130,25 @@ body {
   }
 
   .lb-entry--first {
-    gap: 0.5rem 0.625rem;
-    padding: 1rem 0.75rem;
+    gap: 0.375rem 0.5rem;
+    padding: 0.75rem;
   }
 
   .lb-entry--first .lb-entry-rank {
-    width: 2.25rem;
-    font-size: 1.75rem;
+    width: 3rem;
+    font-size: 1.5rem;
+  }
+
+  .lb-entry--first .lb-entry-rank-value {
+    min-width: 1.75rem;
   }
 
   .lb-entry--first .lb-entry-name {
-    font-size: 1rem;
+    font-size: 0.9375rem;
   }
 
   .lb-entry--first .lb-entry-score-value {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
 
   .lb-entry--first .lb-entry-score {
@@ -1128,21 +1156,25 @@ body {
   }
 
   .lb-entry--second {
-    gap: 0.5rem 0.625rem;
-    padding: 0.875rem 0.75rem;
+    gap: 0.375rem 0.5rem;
+    padding: 0.6875rem 0.75rem;
   }
 
   .lb-entry--second .lb-entry-rank {
-    width: 2rem;
-    font-size: 1.5rem;
+    width: 2.625rem;
+    font-size: 1.375rem;
+  }
+
+  .lb-entry--second .lb-entry-rank-value {
+    min-width: 1.375rem;
   }
 
   .lb-entry--second .lb-entry-name {
-    font-size: 0.9375rem;
+    font-size: 0.875rem;
   }
 
   .lb-entry--second .lb-entry-score-value {
-    font-size: 1.5rem;
+    font-size: 1.375rem;
   }
 
   .lb-entry--second .lb-entry-score {
@@ -1150,8 +1182,12 @@ body {
   }
 
   .lb-entry--third .lb-entry-rank {
-    width: 1.75rem;
+    width: 2.375rem;
     font-size: 1.25rem;
+  }
+
+  .lb-entry--third .lb-entry-rank-value {
+    min-width: 1.25rem;
   }
 
   .lb-entry--third .lb-entry-score-value {
@@ -1163,8 +1199,10 @@ body {
   }
 
   .lb-podium-block {
-    margin-left: 0.25rem;
-    margin-right: 0.25rem;
+    margin-left: 0.125rem;
+    margin-right: 0.125rem;
+    margin-top: 0.375rem;
+    margin-bottom: 0.375rem;
   }
 
   .lb-row--compact,
@@ -1300,6 +1338,11 @@ body {
   .lb-entry-form {
     display: inline-flex;
   }
+}
+
+/* ── Pool highlight cards ── */
+.pool-highlight-card {
+  width: 100%;
 }
 
 .knockout-bracket-scroll::-webkit-scrollbar,

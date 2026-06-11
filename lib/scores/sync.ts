@@ -227,13 +227,14 @@ export async function syncLiveScores(
       continue;
     }
 
+    const inPlay = isMatchInPlayWindow({ ...match, home_score: homeScore, away_score: awayScore });
     const { error: updateError } = await supabase
       .from("matches")
       .update({
         home_score: homeScore,
         away_score: awayScore,
         winner_team_id: winnerTeamId,
-        status: "locked",
+        status: inPlay ? "locked" : "final",
         updated_at: syncedAt,
       })
       .eq("id", match.id);

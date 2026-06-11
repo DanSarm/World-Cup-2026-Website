@@ -16,9 +16,15 @@ const SLOT_LABELS: Record<NonNullable<PickFormSlot>, string> = {
 };
 
 function slotShellClass(result: PickFormSlot): string {
-  if (result === "live-exact") return "bg-amber-200/90 ring-1 ring-amber-400/60";
-  if (result === "live-correct") return "bg-emerald-100 ring-1 ring-emerald-300/70";
-  if (result === "live-wrong") return "bg-red-50 ring-1 ring-red-200";
+  if (result === "exact" || result === "live-exact") {
+    return "bg-gold/30 ring-1 ring-gold/50";
+  }
+  if (result === "correct" || result === "live-correct") {
+    return "bg-mexico/20 ring-1 ring-mexico/40";
+  }
+  if (result === "wrong" || result === "live-wrong") {
+    return "bg-canada/20 ring-1 ring-canada/35";
+  }
   if (result === "live-pending") return "bg-ink/12 ring-1 ring-ink/10";
   return "bg-ink/10";
 }
@@ -38,7 +44,7 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
     return (
       <svg
         viewBox="0 0 12 12"
-        className="w-2.5 h-2.5 text-emerald-600"
+        className="w-2.5 h-2.5 text-mexico"
         aria-hidden
       >
         <path
@@ -56,9 +62,9 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
         className="w-2.5 h-2.5"
         aria-hidden
       >
-        <circle cx="6" cy="6" r="5.25" fill="#fff" stroke="#dc2626" strokeWidth="1.25" />
+        <circle cx="6" cy="6" r="5.25" fill="#fff" stroke="var(--color-canada)" strokeWidth="1.25" />
         <path
-          fill="#dc2626"
+          fill="var(--color-canada)"
           d="M4.1 4.1a.55.55 0 0 1 .78 0L6 5.22l1.12-1.12a.55.55 0 1 1 .78.78L6.78 6l1.12 1.12a.55.55 0 1 1-.78.78L6 6.78 4.88 7.9a.55.55 0 1 1-.78-.78L5.22 6 4.1 4.88a.55.55 0 0 1 0-.78Z"
         />
       </svg>

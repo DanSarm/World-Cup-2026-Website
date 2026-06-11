@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LeaderboardEntry, Match, PickFormSlot } from "@/lib/types";
+import { assignCompetitionRanksImmutable } from "@/lib/competitionRank";
 
 const POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_LIVE_POLL_INTERVAL_MS ?? "600000"
@@ -111,33 +112,32 @@ export function mergeLeaderboard(
   base: LeaderboardEntry[],
   live?: LeaderboardEntry[] | null
 ): LeaderboardEntry[] {
-  if (!live?.length) return base;
+  if (!live?.length) return base.map((entry) => ({ ...entry }));
+
   const byId = new Map(live.map((e) => [e.playerId, e]));
   const merged = base.map((entry) => {
     const updated = byId.get(entry.playerId);
-    if (!updated) return entry;
+    if (!updated) return { ...entry };
     return {
       ...entry,
-      rank: updated.rank,
-      totalPoints: updated.totalPoints,
-      provisionalTotalPoints: updated.provisionalTotalPoints,
-      livePoints: updated.livePoints,
+      paid: updated.paid ?? entry.paid,
+      totalPoints: Math.max(entry.totalPoints, updated.totalPoints),
+      provisionalTotalPoints:
+        updated.provisionalTotalPoints ?? entry.provisionalTotalPoints,
+      livePoints: updated.livePoints ?? entry.livePoints,
       recentForm: (updated.recentForm ?? entry.recentForm) as
         | PickFormSlot[]
         | undefined,
     };
   });
 
-  if (merged.some((e) => e.provisionalTotalPoints != null)) {
-    return [...merged]
-      .sort((a, b) => {
-        const aPts = a.provisionalTotalPoints ?? a.totalPoints;
-        const bPts = b.provisionalTotalPoints ?? b.totalPoints;
-        // Ties keep the server order, which encodes potential points.
-        return bPts - aPts || a.rank - b.rank;
-      })
-      .map((e, i) => ({ ...e, rank: i + 1 }));
-  }
-
-  return merged;
+  const sorted = [...merged].sort((a, b) => {
+    const aPts = a.provisionalTotalPoints ?? a.totalPoints;
+    const bPts = b.provisionalTotalPoints ?? b.totalPoints;
+    return bPts - aPts || a.displayName.localeCompare(b.displayName);
+  });
+  return assignCompetitionRanksImmutable(
+    sorted,
+    (e) => e.provisionalTotalPoints ?? e.totalPoints
+  );
 }

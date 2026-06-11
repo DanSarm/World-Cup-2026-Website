@@ -113,7 +113,7 @@ export function projectPickPoints(
     exactPoints: preview.maxPoints,
     withMarginPoints:
       match.stage === "group" && predHome !== predAway
-        ? preview.resultOnlyPoints + 1
+        ? preview.resultOnlyPoints + 2
         : preview.resultOnlyPoints,
   };
 }

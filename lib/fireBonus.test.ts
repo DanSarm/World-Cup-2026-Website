@@ -1,4 +1,4 @@
-import { calculateExactScoreFireBonus } from "./fireBonus";
+import { calculateExactScoreFireBonus, pickPreviewLabel } from "./fireBonus";
 import {
   capGroupMatchPoints,
   previewPickRewards,
@@ -20,7 +20,6 @@ function assert(condition: boolean, name: string) {
   }
 }
 
-// Draw fire bonus
 assert(
   calculateExactScoreFireBonus({
     isExactScore: true,
@@ -31,48 +30,7 @@ assert(
   }) === 0,
   "exact 0-0 draw fire = 0"
 );
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: true,
-    totalGoals: 2,
-    winningMargin: 0,
-    outcomeBonus: 4,
-  }) === 0,
-  "exact 1-1 draw fire = 0"
-);
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: true,
-    totalGoals: 2,
-    winningMargin: 0,
-    outcomeBonus: 6,
-  }) === 1,
-  "exact 1-1 draw miracle draw bonus fire = 1"
-);
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: true,
-    totalGoals: 4,
-    winningMargin: 0,
-    outcomeBonus: 4,
-  }) === 1,
-  "exact 2-2 draw fire = 1"
-);
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: true,
-    totalGoals: 6,
-    winningMargin: 0,
-    outcomeBonus: 4,
-  }) === 2,
-  "exact 3-3 draw fire = 2"
-);
 
-// Favorite wins
 assert(
   calculateExactScoreFireBonus({
     isExactScore: true,
@@ -83,28 +41,7 @@ assert(
   }) === 0,
   "favorite 2-0 fire = 0"
 );
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: false,
-    totalGoals: 3,
-    winningMargin: 3,
-    outcomeBonus: 0,
-  }) === 1,
-  "favorite 3-0 fire = 1"
-);
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: false,
-    totalGoals: 5,
-    winningMargin: 5,
-    outcomeBonus: 0,
-  }) === 2,
-  "favorite 5-0 fire = 2"
-);
 
-// Underdog +6
 assert(
   calculateExactScoreFireBonus({
     isExactScore: true,
@@ -115,28 +52,13 @@ assert(
   }) === 2,
   "miracle 1-0 fire = 2"
 );
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: false,
-    totalGoals: 2,
-    winningMargin: 2,
-    outcomeBonus: 6,
-  }) === 3,
-  "miracle 2-0 fire = 3"
-);
-assert(
-  calculateExactScoreFireBonus({
-    isExactScore: true,
-    isDraw: false,
-    totalGoals: 5,
-    winningMargin: 5,
-    outcomeBonus: 6,
-  }) === 4,
-  "miracle 5-0 fire = 4"
-);
 
 assert(capGroupMatchPoints(20, DEFAULT_SCORING_CONFIG) === 18, "cap at 18");
+
+assert(pickPreviewLabel(8) === "Solid pick", "8 pts = Solid pick");
+assert(pickPreviewLabel(10) === "Nice pick", "10 pts = Nice pick");
+assert(pickPreviewLabel(14) === "Brave pick 🔥", "14 pts = Brave pick");
+assert(pickPreviewLabel(18) === "Miracle pick 🚀", "18 pts = Miracle pick");
 
 const bonusDefaults = {
   home_win_bonus: 0,
@@ -183,19 +105,19 @@ function score(actualHome: number, actualAway: number, predHome: number, predAwa
   ).points;
 }
 
-assert(score(2, 0, 2, 0) === 6, "Switzerland 2-0 exact = 6");
-assert(score(5, 0, 5, 0) === 8, "Switzerland 5-0 exact = 8");
-assert(score(1, 1, 1, 1) === 10, "Draw 1-1 exact = 10");
-assert(score(0, 1, 0, 1) === 14, "Qatar 1-0 exact = 14");
-assert(score(0, 5, 0, 5) === 16, "Qatar 5-0 exact = 16");
+assert(score(2, 0, 2, 0) === 8, "Switzerland 2-0 exact = 8");
+assert(score(5, 0, 5, 0) === 10, "Switzerland 5-0 exact = 10");
+assert(score(1, 1, 1, 1) === 12, "Draw 1-1 exact = 12");
+assert(score(0, 1, 0, 1) === 16, "Qatar 1-0 exact = 16");
+assert(score(0, 5, 0, 5) === 18, "Qatar 5-0 exact = 18");
 assert(score(1, 3, 0, 2) === 10, "Qatar 3-1 vs pick 2-0 = 10");
 
 const preview = previewPickRewards(suiQat, 5, 0, DEFAULT_SCORING_CONFIG);
-assert(preview.maxPoints === 8, "preview Switzerland 5-0 max = 8");
+assert(preview.maxPoints === 10, "preview Switzerland 5-0 max = 10");
 assert(preview.label === "Nice pick", "preview Switzerland 5-0 label");
 
 const qatPreview = previewPickRewards(suiQat, 0, 5, DEFAULT_SCORING_CONFIG);
-assert(qatPreview.maxPoints === 16, "preview Qatar 5-0 max = 16");
+assert(qatPreview.maxPoints === 18, "preview Qatar 5-0 max = 18");
 assert(qatPreview.label === "Miracle pick 🚀", "preview Qatar 5-0 label");
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -14,7 +14,7 @@ import { buildProjectedPrizes } from "./payouts";
 import { isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
-import { findLiveMatch, hasAnyDisplayableLiveScore } from "./matchLive";
+import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring } from "./matchLive";
 import { matchDateKey } from "./utils";
 import type {
   ActualTournamentResults,
@@ -342,6 +342,20 @@ function attachRankMovement(
   });
 }
 
+async function finalizeCompletedMatches(matches: Match[]): Promise<number> {
+  const supabase = getSupabase();
+  let count = 0;
+  for (const match of matches) {
+    if (!shouldAutoFinalizeMatch(match)) continue;
+    const { error } = await supabase
+      .from("matches")
+      .update({ status: "final", updated_at: new Date().toISOString() })
+      .eq("id", match.id);
+    if (!error) count++;
+  }
+  return count;
+}
+
 export async function getLeaderboardData(options?: {
   includeLiveScores?: boolean;
 }): Promise<{
@@ -354,10 +368,13 @@ export async function getLeaderboardData(options?: {
   hasLiveScoring: boolean;
 }> {
   const includeLiveScores = options?.includeLiveScores ?? false;
-  const [players, matches, predictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
+  let matches = await getMatchesWithTeams();
+  if (await finalizeCompletedMatches(matches)) {
+    matches = await getMatchesWithTeams();
+  }
+  const [players, predictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
     await Promise.all([
       getPlayers(),
-      getMatchesWithTeams(),
       getPredictions(),
       getTournamentPodiumPredictions(),
       getFinalsPredictions(),
@@ -502,7 +519,7 @@ export async function recalculateAllScores(): Promise<void> {
   for (const pred of refreshedPredictions) {
     if (!isConfirmedPick(pred)) continue;
     const match = matches.find((m) => m.id === pred.match_id);
-    if (!match || match.status !== "final") continue;
+    if (!match || !isMatchDecidedForScoring(match)) continue;
     const result = scoreMatchPrediction(match, pred, scoringConfig);
     await supabase
       .from("match_predictions")

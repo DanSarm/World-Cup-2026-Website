@@ -2,6 +2,7 @@ import type { Match } from "./types";
 import { isKnockoutStage } from "./types";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import { pickPreviewLabel } from "./fireBonus";
+import { EXACT_SCORE_BONUS } from "./scoreCloseness";
 
 export interface ScoringConfig {
   exactScoreFireBonusEnabled: boolean;
@@ -140,12 +141,12 @@ export function previewPickRewards(
       outcomeBonus: advanceBonus,
       enabled: config.exactScoreFireBonusEnabled,
     });
-    const maxPoints = roundBase + advanceBonus + 3 + fireBonus;
+    const maxPoints = roundBase + advanceBonus + EXACT_SCORE_BONUS + fireBonus;
     return {
       maxPoints,
       outcomeBonus: advanceBonus,
       fireBonus,
-      exactScoreBonus: 3,
+      exactScoreBonus: EXACT_SCORE_BONUS,
       resultOnlyPoints: roundBase + advanceBonus,
       label: pickPreviewLabel(maxPoints),
     };
@@ -162,7 +163,7 @@ export function previewPickRewards(
     enabled: config.exactScoreFireBonusEnabled,
   });
   const maxPoints = capGroupMatchPoints(
-    resultOnlyPoints + 3 + fireBonus,
+    resultOnlyPoints + EXACT_SCORE_BONUS + fireBonus,
     config
   );
 
@@ -170,7 +171,7 @@ export function previewPickRewards(
     maxPoints,
     outcomeBonus,
     fireBonus,
-    exactScoreBonus: 3,
+    exactScoreBonus: EXACT_SCORE_BONUS,
     resultOnlyPoints,
     label: pickPreviewLabel(maxPoints),
   };
@@ -196,7 +197,7 @@ export function maxPossibleMatchPoints(
     );
     const raw =
       3 +
-      3 +
+      EXACT_SCORE_BONUS +
       maxOutcome +
       (config.exactScoreFireBonusEnabled ? 4 : 0);
     return capGroupMatchPoints(raw, config);
@@ -209,7 +210,7 @@ export function maxPossibleMatchPoints(
   );
   return (
     stagePts +
-    3 +
+    EXACT_SCORE_BONUS +
     maxAdvance +
     (config.exactScoreFireBonusEnabled ? 4 : 0)
   );

@@ -1,5 +1,5 @@
-import { formatInTimeZone } from "date-fns-tz";
-import { isBefore, parseISO } from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { isBefore, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { Match } from "./types";
 
 const TZ = "America/New_York";
@@ -63,6 +63,24 @@ export function getTodayTomorrowKeys(): { today: string; tomorrow: string } {
 export function matchDateKey(kickoffAt: string | null): string {
   if (!kickoffAt) return "tba";
   return formatInTimeZone(parseISO(kickoffAt), TZ, "yyyy-MM-dd");
+}
+
+/** Whether a match kickoff falls in the current Mon–Sun week (Eastern time). */
+export function isMatchInCurrentWeek(kickoffAt: string | null): boolean {
+  if (!kickoffAt) return false;
+  const now = toZonedTime(new Date(), TZ);
+  const kickoff = toZonedTime(parseISO(kickoffAt), TZ);
+  const interval = {
+    start: startOfWeek(now, { weekStartsOn: 1 }),
+    end: endOfWeek(now, { weekStartsOn: 1 }),
+  };
+  return isWithinInterval(kickoff, interval);
+}
+
+export function isMatchToday(kickoffAt: string | null): boolean {
+  if (!kickoffAt) return false;
+  const { today } = getTodayTomorrowKeys();
+  return matchDateKey(kickoffAt) === today;
 }
 
 export function canPickMatch(match: Match): boolean {
