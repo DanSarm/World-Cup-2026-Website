@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { PicksMatchCard } from "./PicksMatchCard";
 import type { CommunityMatchPick } from "@/lib/data";
+import { usePicksRefresh } from "@/lib/hooks/usePicksRefresh";
 import { PageHeader } from "./PageHeader";
 import {
   groupMatchesForPicks,
@@ -50,18 +51,25 @@ export function PicksClient({
 }: PicksClientProps) {
   const [filter, setFilter] = useState<PicksFilter>("need");
   const [teamFilter, setTeamFilter] = useState<string>("");
+  const { data: snapshot, refresh } = usePicksRefresh(true);
+
+  const liveMatches = snapshot?.matches ?? matches;
+  const livePredictions = snapshot?.predictions ?? predictions;
+  const liveCommunityPicks =
+    snapshot?.communityPicksByMatchId ?? communityPicksByMatchId;
+  const liveTotalPlayers = snapshot?.totalPlayers ?? totalPlayers;
 
   const predMap = useMemo(
-    () => new Map(predictions.map((p) => [p.match_id, p])),
-    [predictions]
+    () => new Map(livePredictions.map((p) => [p.match_id, p])),
+    [livePredictions]
   );
 
   const teamMatches = useMemo(() => {
-    if (!teamFilter) return matches;
-    return matches.filter(
+    if (!teamFilter) return liveMatches;
+    return liveMatches.filter(
       (m) => m.home_team_id === teamFilter || m.away_team_id === teamFilter
     );
-  }, [matches, teamFilter]);
+  }, [liveMatches, teamFilter]);
 
   const sections = useMemo(
     () => groupMatchesForPicks(teamMatches),
@@ -72,11 +80,11 @@ export function PicksClient({
     [sections, filter, predMap]
   );
   const progress = useMemo(
-    () => picksProgress(matches, predMap),
-    [matches, predMap]
+    () => picksProgress(liveMatches, predMap),
+    [liveMatches, predMap]
   );
 
-  const openSaved = matches.filter(
+  const openSaved = liveMatches.filter(
     (m) => canPickMatch(m) && hasSavedPick(predMap.get(m.id))
   ).length;
   const pct =
@@ -167,9 +175,10 @@ export function PicksClient({
                   match={m}
                   prediction={predMap.get(m.id)}
                   scoringConfig={scoringConfig}
-                  picks={communityPicksByMatchId[m.id] ?? []}
+                  picks={liveCommunityPicks[m.id] ?? []}
                   currentPlayerId={currentPlayerId}
-                  totalPlayers={totalPlayers}
+                  totalPlayers={liveTotalPlayers}
+                  onPickSaved={refresh}
                 />
               ))}
             </div>

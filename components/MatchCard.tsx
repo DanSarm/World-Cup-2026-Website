@@ -36,6 +36,7 @@ interface MatchCardProps {
   embedded?: boolean;
   /** Community consensus, e.g. { score: "2–1", percent: 45 } */
   mostPickedScore?: { score: string; percent: number } | null;
+  onPickSaved?: () => void;
 }
 
 export function MatchCard({
@@ -46,6 +47,7 @@ export function MatchCard({
   showPickCountdown = false,
   embedded = false,
   mostPickedScore = null,
+  onPickSaved,
 }: MatchCardProps) {
   const router = useRouter();
   const saved = hasSavedPick(prediction);
@@ -100,8 +102,9 @@ export function MatchCard({
       setError(null);
       setIsLocked(true);
       router.refresh();
+      onPickSaved?.();
     });
-  }, [homeScore, awayScore, winnerId, needsWinner, match.id, router]);
+  }, [homeScore, awayScore, winnerId, needsWinner, match.id, router, onPickSaved]);
 
   function handleLockToggle() {
     if (isLocked) {

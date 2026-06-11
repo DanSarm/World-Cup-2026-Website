@@ -14,8 +14,9 @@ import { buildProjectedPrizes } from "./payouts";
 import { isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
-import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring } from "./matchLive";
+import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchInPlayWindow } from "./matchLive";
 import { matchDateKey } from "./utils";
+import { resolveMatchesForPicks } from "./resolvedMatches";
 import type {
   ActualTournamentResults,
   BigPrediction,
@@ -514,6 +515,33 @@ export async function getLiveSnapshot() {
   const sync = await syncLiveScores();
   const snapshot = await getLeaderboardData({ includeLiveScores: true });
   return { sync, ...snapshot };
+}
+
+export async function getPicksSnapshot(playerId: string) {
+  let matches = await getMatchesWithTeams();
+  if (isAnyMatchInPlayWindow(matches)) {
+    const { syncLiveScores } = await import("./scores/sync");
+    await syncLiveScores();
+    matches = await getMatchesWithTeams();
+  }
+
+  const pickMatches = resolveMatchesForPicks(matches);
+  const matchIds = pickMatches.map((m) => m.id);
+
+  const [predictions, players, communityPicksByMatchId] = await Promise.all([
+    getPredictions(playerId),
+    getPlayers(),
+    getConfirmedMatchPicksByMatchIds(matchIds),
+  ]);
+
+  return {
+    syncedAt: new Date().toISOString(),
+    matches: pickMatches,
+    predictions,
+    communityPicksByMatchId: Object.fromEntries(communityPicksByMatchId),
+    totalPlayers: players.length,
+    hasLiveScoring: hasAnyDisplayableLiveScore(matches),
+  };
 }
 
 export async function recalculateAllScores(): Promise<void> {

@@ -7,10 +7,6 @@ import type { ScoringConfig } from "@/lib/scoringConfig";
 import { MatchCard } from "./MatchCard";
 import { MatchCommunityPicks } from "./MatchCommunityPicks";
 import {
-  mergeLiveMatchFromPayload,
-  useLiveRefresh,
-} from "@/lib/hooks/useLiveRefresh";
-import {
   hasDisplayableLiveScore,
   isMatchInPlayWindow,
   isMatchLive,
@@ -23,6 +19,7 @@ interface PicksMatchCardProps {
   currentPlayerId: string;
   scoringConfig: ScoringConfig;
   totalPlayers: number;
+  onPickSaved?: () => void;
 }
 
 function mostPickedFromCommunityPicks(
@@ -53,22 +50,14 @@ function mostPickedFromCommunityPicks(
 }
 
 export function PicksMatchCard({
-  match: initialMatch,
+  match,
   prediction,
   picks,
   currentPlayerId,
   scoringConfig,
   totalPlayers,
+  onPickSaved,
 }: PicksMatchCardProps) {
-  const pollLive =
-    isMatchLive(initialMatch) || isMatchInPlayWindow(initialMatch);
-  const { data } = useLiveRefresh(pollLive);
-
-  const match = useMemo(
-    () => mergeLiveMatchFromPayload(initialMatch, data),
-    [initialMatch, data]
-  );
-
   const showingLiveScore = hasDisplayableLiveScore(match);
   const isLive = isMatchLive(match);
   const mostPickedScore = useMemo(() => {
@@ -87,6 +76,7 @@ export function PicksMatchCard({
         }
         embedded
         mostPickedScore={mostPickedScore}
+        onPickSaved={onPickSaved}
       />
       <MatchCommunityPicks
         match={match}
