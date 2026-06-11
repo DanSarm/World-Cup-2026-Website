@@ -14,7 +14,7 @@ import { buildProjectedPrizes } from "./payouts";
 import { isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
-import { findLiveMatch, hasAnyLiveMatch } from "./matchLive";
+import { findLiveMatch, hasAnyDisplayableLiveScore } from "./matchLive";
 import { matchDateKey } from "./utils";
 import type {
   ActualTournamentResults,
@@ -460,7 +460,7 @@ export async function getLeaderboardData(options?: {
     players,
     matches,
     liveMatch,
-    hasLiveScoring: hasAnyLiveMatch(matches),
+    hasLiveScoring: hasAnyDisplayableLiveScore(matches),
   };
 }
 

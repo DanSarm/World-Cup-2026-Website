@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getLiveSnapshot } from "@/lib/data";
-import { isMatchLive } from "@/lib/matchLive";
+import {
+  findLiveMatch,
+  findCurrentlyPlayingMatches,
+  hasDisplayableLiveScore,
+} from "@/lib/matchLive";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +18,8 @@ export async function GET() {
   try {
     const snapshot = await getLiveSnapshot();
     const liveMatch = snapshot.liveMatch;
+
+    const liveMatches = findCurrentlyPlayingMatches(snapshot.matches);
 
     return NextResponse.json({
       syncedAt: snapshot.sync.syncedAt,
@@ -47,8 +53,8 @@ export async function GET() {
         podiumPicks: entry.podiumPicks,
         recentForm: entry.recentForm,
       })),
-      matches: snapshot.matches
-        .filter((m) => isMatchLive(m) || m.status === "final")
+      matches: liveMatches
+        .filter((m) => hasDisplayableLiveScore(m) || m.status === "final")
         .map((m) => ({
           id: m.id,
           status: m.status,

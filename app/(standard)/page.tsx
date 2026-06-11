@@ -11,13 +11,14 @@ import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
 import { HomeFeaturedMatchSection } from "@/components/HomeFeaturedMatchSection";
 import { HomePodiumSection } from "@/components/HomePodiumSection";
 import { HomeTopFive } from "@/components/HomeTopFive";
-import { findLiveMatch, isAnyMatchInPlayWindow } from "@/lib/matchLive";
+import { findCurrentlyPlayingMatches, isAnyMatchInPlayWindow, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
+import { syncLiveScores } from "@/lib/scores/sync";
 
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [{ leaderboard }, matches, predictions, settings, teams, myPodium, players] = await Promise.all([
+  const [{ leaderboard: leaderboardInitial }, matchesRaw, predictions, settings, teams, myPodium, players] = await Promise.all([
     getLeaderboardData(),
     getMatchesWithTeams(),
     getPredictions(session.id),
@@ -27,17 +28,35 @@ export default async function HomePage() {
     getPlayers(),
   ]);
 
+  const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
+  if (liveMatchesInitial.length > 0) {
+    await syncLiveScores();
+  }
+  const matches =
+    liveMatchesInitial.length > 0 ? await getMatchesWithTeams() : matchesRaw;
+  const { leaderboard } =
+    liveMatchesInitial.length > 0
+      ? await getLeaderboardData({ includeLiveScores: true })
+      : { leaderboard: leaderboardInitial };
+
   const prizePool = calculatePrizePool(players.filter((p) => p.paid).length);
 
   const scoringConfig = scoringConfigFromSettings(settings);
   const predMap = new Map(predictions.map((p) => [p.match_id, p]));
-  const liveMatch = findLiveMatch(matches);
-  const upcomingMatches = findNextUpcomingMatches(matches, 2);
+  const liveMatches = findCurrentlyPlayingMatches(matches);
+  const featuredLiveMatches = liveMatches.slice(0, 1);
+  const liveMatchIds = new Set(liveMatches.map((m) => m.id));
+  const upcomingLimit = featuredLiveMatches.length > 0 ? 1 : 2;
+  const upcomingMatches = findNextUpcomingMatches(
+    matches,
+    upcomingLimit,
+    liveMatchIds
+  );
   const worldCupKickoff = getWorldCupKickoff(matches);
   const podiumLocked = isTournamentPodiumLocked(settings, matches);
 
   const matchIdsToLoad = [
-    ...(liveMatch ? [liveMatch.id] : []),
+    ...featuredLiveMatches.map((m) => m.id),
     ...upcomingMatches.map((m) => m.id),
   ];
   const communityPicksByMatchId = new Map(
@@ -72,18 +91,7 @@ export default async function HomePage() {
         championProbabilities={settings.champion_probabilities}
       />
 
-      {liveMatch && (
-        <HomeFeaturedMatchSection
-          match={liveMatch}
-          prediction={predMap.get(liveMatch.id)}
-          picks={communityPicksByMatchId.get(liveMatch.id) ?? []}
-          currentPlayerId={session.id}
-          scoringConfig={scoringConfig}
-          totalPlayers={totalPlayers}
-        />
-      )}
-
-      {upcomingMatches.map((match, index) => (
+      {featuredLiveMatches.map((match) => (
         <HomeFeaturedMatchSection
           key={match.id}
           match={match}
@@ -91,17 +99,33 @@ export default async function HomePage() {
           picks={communityPicksByMatchId.get(match.id) ?? []}
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
-          sectionLabel={index === 0 ? "Next game" : "Up next"}
+          sectionLabel="Live now"
           totalPlayers={totalPlayers}
         />
       ))}
 
-      {!liveMatch && upcomingMatches.length === 0 && <AllPicksDoneHero />}
+      {upcomingMatches.map((match) => (
+        <HomeFeaturedMatchSection
+          key={match.id}
+          match={match}
+          prediction={predMap.get(match.id)}
+          picks={communityPicksByMatchId.get(match.id) ?? []}
+          currentPlayerId={session.id}
+          scoringConfig={scoringConfig}
+          sectionLabel="Next game"
+          totalPlayers={totalPlayers}
+        />
+      ))}
+
+      {featuredLiveMatches.length === 0 && upcomingMatches.length === 0 && (
+        <AllPicksDoneHero />
+      )}
 
       <HomeTopFive
         initialEntries={leaderboard}
         prizePool={prizePool}
         pollLive={isAnyMatchInPlayWindow(matches)}
+        initialHasLiveScoring={hasAnyDisplayableLiveScore(matches)}
       />
     </div>
   );

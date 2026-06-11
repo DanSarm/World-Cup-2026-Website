@@ -1,3 +1,5 @@
+import type { Match } from "@/lib/types";
+import { teamNameMatches } from "@/lib/odds/teamAliases";
 import { getOddsConfig, isOddsApiConfigured } from "@/lib/odds/config";
 
 export interface OddsApiScoreEntry {
@@ -67,14 +69,28 @@ export function isScoresApiConfigured(): boolean {
 }
 
 /** Parse home/away integer scores from an Odds API score event. */
-export function parseScoreEventScores(event: OddsApiScoreEvent): {
+export function parseScoreEventScores(
+  event: OddsApiScoreEvent,
+  match?: Pick<Match, "home_team" | "away_team">
+): {
   homeScore: number;
   awayScore: number;
 } | null {
   if (!event.scores?.length) return null;
 
-  const homeEntry = event.scores.find((s) => s.name === event.home_team);
-  const awayEntry = event.scores.find((s) => s.name === event.away_team);
+  const homeTeam = match?.home_team;
+  const awayTeam = match?.away_team;
+
+  const homeEntry = event.scores.find((s) => {
+    if (homeTeam && teamNameMatches(s.name, homeTeam)) return true;
+    if (!homeTeam) return s.name === event.home_team;
+    return false;
+  });
+  const awayEntry = event.scores.find((s) => {
+    if (awayTeam && teamNameMatches(s.name, awayTeam)) return true;
+    if (!awayTeam) return s.name === event.away_team;
+    return false;
+  });
   if (!homeEntry || !awayEntry) return null;
 
   const homeScore = Number.parseInt(homeEntry.score, 10);

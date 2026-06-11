@@ -72,7 +72,18 @@ export function useLiveRefresh(enabled: boolean) {
   return { data, loading, refresh };
 }
 
-export function mergeLiveMatch(base: Match, live?: LiveApiPayload["liveMatch"]): Match {
+export function mergeLiveMatch(
+  base: Match,
+  live?: Pick<
+    Match,
+    | "id"
+    | "status"
+    | "home_score"
+    | "away_score"
+    | "winner_team_id"
+    | "live_updated_at"
+  > | null
+): Match {
   if (!live || live.id !== base.id) return base;
   return {
     ...base,
@@ -82,6 +93,18 @@ export function mergeLiveMatch(base: Match, live?: LiveApiPayload["liveMatch"]):
     winner_team_id: live.winner_team_id,
     live_updated_at: live.live_updated_at,
   };
+}
+
+export function mergeLiveMatchFromPayload(
+  base: Match,
+  payload: Pick<LiveApiPayload, "liveMatch" | "matches"> | null | undefined
+): Match {
+  if (!payload) return base;
+  const update =
+    payload.liveMatch?.id === base.id
+      ? payload.liveMatch
+      : payload.matches.find((m) => m.id === base.id);
+  return mergeLiveMatch(base, update);
 }
 
 export function mergeLeaderboard(

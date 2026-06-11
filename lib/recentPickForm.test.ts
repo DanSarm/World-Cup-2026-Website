@@ -1,5 +1,6 @@
 import {
   buildPlayerRecentForm,
+  classifyLivePickResult,
   classifyPickResult,
 } from "./recentPickForm";
 import { DEFAULT_SCORING_CONFIG } from "./scoringConfig";
@@ -114,6 +115,47 @@ assert(form.length === 5, "returns five slots");
 assert(form[4] === "correct", "rightmost is latest match (draw, not exact)");
 assert(form[0] === "exact", "leftmost is oldest of last five");
 assert(form[2] === "exact", "middle slot includes exact score");
+
+const liveMatch: Match = {
+  ...matchBase,
+  id: "live",
+  match_number: 7,
+  status: "locked",
+  home_score: 1,
+  away_score: 0,
+  winner_team_id: null,
+};
+
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 1, 0), DEFAULT_SCORING_CONFIG) ===
+    "live-exact",
+  "live exact score"
+);
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 2, 0), DEFAULT_SCORING_CONFIG) ===
+    "live-correct",
+  "live correct winner"
+);
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 0, 1), DEFAULT_SCORING_CONFIG) ===
+    "live-wrong",
+  "away win pick wrong when home leads"
+);
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 1, 2), DEFAULT_SCORING_CONFIG) ===
+    "live-wrong",
+  "away win scoreline wrong when home leads"
+);
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 2, 0), DEFAULT_SCORING_CONFIG) ===
+    "live-correct",
+  "home win pick correct when home leads"
+);
+assert(
+  classifyLivePickResult(liveMatch, pred("live", 1, 1), DEFAULT_SCORING_CONFIG) ===
+    "live-pending",
+  "live pending when still possible"
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

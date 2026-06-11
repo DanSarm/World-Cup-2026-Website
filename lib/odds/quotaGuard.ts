@@ -47,7 +47,9 @@ async function getDailyScoreSyncCount(): Promise<number> {
 }
 
 export async function getStoredCreditsRemaining(): Promise<number | null> {
-  const v = Number(await readSetting(CREDITS_REMAINING_KEY));
+  const raw = await readSetting(CREDITS_REMAINING_KEY);
+  if (raw == null || raw === "") return null;
+  const v = Number(raw);
   return Number.isFinite(v) ? v : null;
 }
 

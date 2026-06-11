@@ -13,6 +13,7 @@ import type {
   TournamentPodiumPrediction,
 } from "./types";
 import { isKnockoutStage } from "./types";
+import { hasDisplayableLiveScore } from "./matchLive";
 import { isConfirmedPick, getEffectiveMatchPrediction } from "./pickUtils";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
@@ -141,7 +142,11 @@ export function scoreMatchPrediction(
 
   const allowLive = options?.allowLive === true;
   const scoreable =
-    match.status === "final" || (allowLive && match.status === "live");
+    match.status === "final" ||
+    (allowLive &&
+      match.home_score !== null &&
+      match.away_score !== null &&
+      (match.status === "live" || match.status === "locked"));
 
   if (
     !scoreable ||
@@ -597,7 +602,7 @@ export function calculateLeaderboard(
         if (result.exactScore) exactScores++;
         if (result.correctResult) correctResults++;
         if (result.knockoutCorrect) knockoutCorrect++;
-      } else if (includeLiveScores && match.status === "live") {
+      } else if (includeLiveScores && hasDisplayableLiveScore(match)) {
         const result = scoreMatchPrediction(match, effective, scoringConfig, {
           allowLive: true,
         });

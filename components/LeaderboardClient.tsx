@@ -21,6 +21,7 @@ interface LeaderboardClientProps {
     bestPerfectDay: { name: string; count: number } | null;
   };
   pollLive?: boolean;
+  initialHasLiveScoring?: boolean;
 }
 
 export function LeaderboardClient({
@@ -28,11 +29,12 @@ export function LeaderboardClient({
   prizePool,
   funStats,
   pollLive = false,
+  initialHasLiveScoring = false,
 }: LeaderboardClientProps) {
   const [filter, setFilter] = useState<LeaderboardFilter>("paid");
   const { data } = useLiveRefresh(pollLive);
 
-  const hasLiveScoring = data?.hasLiveScoring ?? false;
+  const hasLiveScoring = data?.hasLiveScoring ?? initialHasLiveScoring;
   const leaderboard = useMemo(
     () => mergeLeaderboard(initialLeaderboard, data?.leaderboard),
     [initialLeaderboard, data?.leaderboard]

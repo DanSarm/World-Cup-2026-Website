@@ -9,10 +9,9 @@ import {
   recordOddsApiUsage,
   shouldIncludeRecentCompletedScores,
 } from "@/lib/odds/quotaGuard";
-import { shouldSyncLiveScoresFromApi } from "@/lib/matchLive";
+import { shouldSyncLiveScoresFromApi, isMatchInPlayWindow } from "@/lib/matchLive";
 import {
   fetchLiveScores,
-  isScoreEventLive,
   isScoresApiConfigured,
   parseScoreEventScores,
   type OddsApiScoreEvent,
@@ -54,12 +53,19 @@ function matchScoreEventToFixture(
   const away = match.away_team;
   if (!home || !away) return null;
 
+  const direct =
+    events.find(
+      (event) =>
+        teamNameMatches(event.home_team, home) &&
+        teamNameMatches(event.away_team, away)
+    ) ?? null;
+  if (direct) return direct;
+
   return (
     events.find(
       (event) =>
-        event.scores?.length &&
-        teamNameMatches(event.home_team, home) &&
-        teamNameMatches(event.away_team, away)
+        teamNameMatches(event.home_team, away) &&
+        teamNameMatches(event.away_team, home)
     ) ?? null
   );
 }
@@ -143,7 +149,16 @@ export async function syncLiveScores(
   }
 
   const lastSync = await getLastSyncTime();
-  if (!force && Date.now() - lastSync < minSyncIntervalMs()) {
+  const inPlayNeedsScore = matches.some(
+    (m) =>
+      isMatchInPlayWindow(m) &&
+      (m.home_score === null || m.away_score === null)
+  );
+  if (
+    !force &&
+    !inPlayNeedsScore &&
+    Date.now() - lastSync < minSyncIntervalMs()
+  ) {
     return {
       synced: false,
       skipped: "throttled",
@@ -183,43 +198,50 @@ export async function syncLiveScores(
     const event = matchScoreEventToFixture(events, match);
     if (!event) continue;
 
-    const parsed = parseScoreEventScores(event);
+    const parsed = parseScoreEventScores(event, match);
     if (!parsed) continue;
 
     const { homeScore, awayScore } = parsed;
     const winnerTeamId = inferWinnerTeamId(match, homeScore, awayScore);
-    const lastUpdate = event.last_update ?? syncedAt;
 
     if (event.completed) {
-      await supabase
+      const { error: finalizeError } = await supabase
         .from("matches")
         .update({
           home_score: homeScore,
           away_score: awayScore,
           winner_team_id: winnerTeamId,
           status: "final",
-          live_updated_at: lastUpdate,
           updated_at: syncedAt,
         })
         .eq("id", match.id);
+      if (finalizeError) {
+        console.error(
+          `Final score update failed for match ${match.id}:`,
+          finalizeError.message
+        );
+        continue;
+      }
       finalized++;
       needsRecalc = true;
       continue;
     }
 
-    if (!isScoreEventLive(event)) continue;
-
-    await supabase
+    const { error: updateError } = await supabase
       .from("matches")
       .update({
         home_score: homeScore,
         away_score: awayScore,
         winner_team_id: winnerTeamId,
-        status: "live",
-        live_updated_at: lastUpdate,
+        status: "locked",
         updated_at: syncedAt,
       })
       .eq("id", match.id);
+
+    if (updateError) {
+      console.error(`Live score update failed for match ${match.id}:`, updateError.message);
+      continue;
+    }
 
     updated++;
     liveMatchIds.push(match.id);

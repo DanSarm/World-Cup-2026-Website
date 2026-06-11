@@ -37,11 +37,12 @@ export function PickCountdownBadge({
   kickoffAt: string | null;
   label?: string;
 }) {
-  const [left, setLeft] = useState(() => getTimeLeft(kickoffAt));
+  const [left, setLeft] = useState<ReturnType<typeof getTimeLeft>>(null);
 
   useEffect(() => {
-    setLeft(getTimeLeft(kickoffAt));
-    const id = setInterval(() => setLeft(getTimeLeft(kickoffAt)), 1000);
+    const tick = () => setLeft(getTimeLeft(kickoffAt));
+    tick();
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [kickoffAt]);
 
@@ -58,7 +59,24 @@ export function PickCountdownBadge({
     );
   }
 
-  if (!left || left.totalMs <= 0) {
+  if (left === null) {
+    return (
+      <div
+        className="shrink-0 text-right leading-tight"
+        title="Time left to pick"
+        aria-hidden
+      >
+        <span className="text-base font-extrabold text-usa tabular-nums">
+          --:--:--
+        </span>
+        <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+          left
+        </span>
+      </div>
+    );
+  }
+
+  if (left.totalMs <= 0) {
     return (
       <div className="shrink-0 text-right leading-tight">
         <span className="text-base font-extrabold text-canada tabular-nums">

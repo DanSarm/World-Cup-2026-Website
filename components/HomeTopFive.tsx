@@ -15,17 +15,20 @@ interface HomeTopFiveProps {
   prizePool: number;
   /** Poll for live score updates only while a match may be in play. */
   pollLive?: boolean;
+  /** SSR hint before the first live poll returns. */
+  initialHasLiveScoring?: boolean;
 }
 
 export function HomeTopFive({
   initialEntries,
   prizePool,
   pollLive = false,
+  initialHasLiveScoring = false,
 }: HomeTopFiveProps) {
   const [filter, setFilter] = useState<LeaderboardFilter>("paid");
   const { data } = useLiveRefresh(pollLive);
 
-  const hasLive = data?.hasLiveScoring ?? false;
+  const hasLive = data?.hasLiveScoring ?? initialHasLiveScoring;
   const leaderboard = useMemo(
     () => mergeLeaderboard(initialEntries, data?.leaderboard),
     [initialEntries, data?.leaderboard]

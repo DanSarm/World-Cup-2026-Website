@@ -1,4 +1,10 @@
+import { hasDisplayableLiveScore } from "@/lib/matchLive";
 import type { CommunityMatchPick } from "@/lib/data";
+import {
+  isPickExactImpossible,
+  isPickLiveEliminated,
+  withLiveFormSlot,
+} from "@/lib/recentPickForm";
 import {
   previewPickRewards,
   DEFAULT_SCORING_CONFIG,
@@ -107,7 +113,24 @@ export function MatchCommunityPicks({
   const totalGoals = (pick: CommunityMatchPick) =>
     pick.predHomeScore + pick.predAwayScore;
 
+  const showingLiveScore = hasDisplayableLiveScore(match);
+
   const sortedPicks = [...picks].sort((a, b) => {
+    if (showingLiveScore) {
+      const pickPrediction = (pick: CommunityMatchPick) => ({
+        pred_home_score: pick.predHomeScore,
+        pred_away_score: pick.predAwayScore,
+        pred_winner_team_id: pick.predWinnerTeamId,
+      });
+      const aOut =
+        isPickExactImpossible(match, a) ||
+        isPickLiveEliminated(match, pickPrediction(a), scoringConfig);
+      const bOut =
+        isPickExactImpossible(match, b) ||
+        isPickLiveEliminated(match, pickPrediction(b), scoringConfig);
+      if (aOut !== bOut) return aOut ? 1 : -1;
+    }
+
     const aKey = scoreKey(a);
     const bKey = scoreKey(b);
     const aPts = groupPts.get(aKey) ?? -1;
@@ -128,29 +151,29 @@ export function MatchCommunityPicks({
         sortedPicks.map((pick) => {
           const isYou = pick.playerId === currentPlayerId;
           const maxPts = maxPointsIfCorrect(match, pick, scoringConfig);
-          const isLive =
-            match.status === "live" &&
-            match.home_score != null &&
-            match.away_score != null;
-          // Goals only go up, so once the live score passes a prediction
-          // on either side that exact score can never happen.
+          const pickPrediction = {
+            pred_home_score: pick.predHomeScore,
+            pred_away_score: pick.predAwayScore,
+            pred_winner_team_id: pick.predWinnerTeamId,
+          };
+          const isLive = showingLiveScore;
+          const liveEliminated =
+            isLive && isPickLiveEliminated(match, pickPrediction, scoringConfig);
           const exactImpossible =
-            isLive &&
-            (match.home_score! > pick.predHomeScore ||
-              match.away_score! > pick.predAwayScore);
+            isLive && isPickExactImpossible(match, pick);
           const exactRightNow =
             isLive &&
             match.home_score === pick.predHomeScore &&
             match.away_score === pick.predAwayScore;
           const rowStateClass = exactRightNow
             ? "bg-mexico/10"
-            : exactImpossible
+            : liveEliminated || exactImpossible
               ? "opacity-45 grayscale"
               : isYou
                 ? "bg-usa/5"
                 : "";
           const livePts =
-            showLivePoints && match.status === "live"
+            showLivePoints && showingLiveScore
               ? scoreMatchPrediction(
                   match,
                   {
@@ -182,7 +205,12 @@ export function MatchCommunityPicks({
                 )}
               </span>
               <RecentPickFormDots
-                form={pick.recentForm ?? []}
+                form={withLiveFormSlot(
+                  pick.recentForm ?? [],
+                  match,
+                  pickPrediction,
+                  scoringConfig
+                )}
                 className="lb-entry-form"
               />
               <span className="lb-row-pick">

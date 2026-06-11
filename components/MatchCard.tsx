@@ -10,7 +10,7 @@ import type { Match, MatchPrediction, Team } from "@/lib/types";
 import { previewPickRewards, DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/scoringConfig";
 import { scoreMatchPrediction } from "@/lib/scoring";
 import { hasSavedPick, getEffectiveMatchPrediction, usesDefaultMissingPick } from "@/lib/pickUtils";
-import { isMatchLive } from "@/lib/matchLive";
+import { isMatchLive, hasDisplayableLiveScore } from "@/lib/matchLive";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { MatchBonusPills } from "./MatchBonusPills";
@@ -61,6 +61,7 @@ export function MatchCard({
   const lock = getLockStatus(match);
   const pickable = canPickMatch(match);
   const isLive = isMatchLive(match);
+  const showingLiveScore = hasDisplayableLiveScore(match);
   const isKO = isKnockoutStage(match.stage);
   const needsWinner =
     isKO && homeScore !== null && awayScore !== null && homeScore === awayScore;
@@ -217,8 +218,8 @@ export function MatchCard({
           )}
         </div>
         <div className="flex items-start gap-2 shrink-0">
-          {isLive && <LivePill />}
-          {showPickCountdown && !isLive && (
+          {showingLiveScore && <LivePill />}
+          {showPickCountdown && !showingLiveScore && !isLive && (
             <PickCountdownBadge kickoffAt={match.kickoff_at} />
           )}
           {pickable && (
@@ -243,8 +244,8 @@ export function MatchCard({
         displayAway={displayAway}
         onHomeChange={handleHomeChange}
         onAwayChange={handleAwayChange}
-        liveHomeScore={isLive ? match.home_score : null}
-        liveAwayScore={isLive ? match.away_score : null}
+        liveHomeScore={showingLiveScore ? match.home_score : null}
+        liveAwayScore={showingLiveScore ? match.away_score : null}
       />
 
       <MatchOddsBar match={match} />
@@ -280,11 +281,11 @@ export function MatchCard({
         </div>
       )}
 
-      {isLive && match.home_score !== null && match.away_score !== null && (
+      {showingLiveScore && (
         <div className="rounded-xl border border-canada/25 bg-canada/5 px-4 py-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold uppercase tracking-wide text-canada">
-              Live score
+              Live score · {match.home_score}–{match.away_score}
             </p>
             {match.live_updated_at && (
               <p className="text-[10px] text-ink-faint tabular-nums">
@@ -455,7 +456,7 @@ function MatchupRow({
   liveAwayScore?: number | null;
 }) {
   const showingLive =
-    liveHomeScore != null && liveAwayScore != null && match.status === "live";
+    liveHomeScore != null && liveAwayScore != null;
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 md:gap-3">

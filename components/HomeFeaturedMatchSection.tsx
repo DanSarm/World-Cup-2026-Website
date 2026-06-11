@@ -7,10 +7,14 @@ import type { ScoringConfig } from "@/lib/scoringConfig";
 import { MatchCard } from "./MatchCard";
 import { MatchCommunityPicks } from "./MatchCommunityPicks";
 import {
-  mergeLiveMatch,
+  mergeLiveMatchFromPayload,
   useLiveRefresh,
 } from "@/lib/hooks/useLiveRefresh";
-import { isMatchInPlayWindow, isMatchLive } from "@/lib/matchLive";
+import {
+  hasDisplayableLiveScore,
+  isMatchInPlayWindow,
+  isMatchLive,
+} from "@/lib/matchLive";
 import { canPickMatch } from "@/lib/utils";
 import { hasSavedPick } from "@/lib/pickUtils";
 import { UrgentPill } from "./UrgentPill";
@@ -40,14 +44,15 @@ export function HomeFeaturedMatchSection({
   const { data } = useLiveRefresh(pollLive);
 
   const match = useMemo(
-    () => mergeLiveMatch(initialMatch, data?.liveMatch ?? undefined),
-    [initialMatch, data?.liveMatch]
+    () => mergeLiveMatchFromPayload(initialMatch, data),
+    [initialMatch, data]
   );
 
+  const showingLiveScore = hasDisplayableLiveScore(match);
   const isLive = isMatchLive(match);
   const needsPick = canPickMatch(match) && !hasSavedPick(prediction);
   const heading =
-    sectionLabel ?? (isLive ? "Live now" : "Upcoming game");
+    sectionLabel ?? (showingLiveScore || isLive ? "Live now" : "Upcoming game");
 
   const mostPickedScore = useMemo(() => {
     if (!picks.length) return null;
@@ -81,18 +86,20 @@ export function HomeFeaturedMatchSection({
           {needsPick && <UrgentPill />}
         </div>
         <p className="text-xs text-ink-muted mt-0.5">
-          {isLive
-            ? "Live score updates every ~10 minutes · standings reflect the current score"
-            : "Make your pick, then see what everyone else is going with"}
+          {showingLiveScore || isLive
+            ? "Live score updates on a schedule · standings reflect the current score"
+            : isMatchInPlayWindow(match)
+              ? "Waiting for live score sync…"
+              : "Make your pick, then see what everyone else is going with"}
         </p>
       </div>
       <MatchCard
         match={match}
         prediction={prediction}
         scoringConfig={scoringConfig}
-        showPickCountdown={!isLive}
+        showPickCountdown={!showingLiveScore && !isLive && !isMatchInPlayWindow(match)}
         embedded
-        mostPickedScore={isLive ? null : mostPickedScore}
+        mostPickedScore={showingLiveScore || isLive ? null : mostPickedScore}
       />
       <MatchCommunityPicks
         match={match}
@@ -100,7 +107,7 @@ export function HomeFeaturedMatchSection({
         currentPlayerId={currentPlayerId}
         scoringConfig={scoringConfig}
         embedded
-        showLivePoints={isLive}
+        showLivePoints={showingLiveScore || isLive}
         totalPlayers={totalPlayers}
       />
     </section>

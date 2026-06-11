@@ -18,9 +18,12 @@ export function findNextUpcomingMatch(matches: Match[]): Match | null {
 /** Next N open matches by kickoff (home page upcoming queue). */
 export function findNextUpcomingMatches(
   matches: Match[],
-  limit = 2
+  limit = 2,
+  excludeIds: Set<string> = new Set()
 ): Match[] {
-  return sortPickableByKickoff(matches).slice(0, limit);
+  return sortPickableByKickoff(matches)
+    .filter((m) => !excludeIds.has(m.id))
+    .slice(0, limit);
 }
 
 export function findNextMatchNeedingPick(
