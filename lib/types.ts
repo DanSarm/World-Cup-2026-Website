@@ -260,7 +260,8 @@ export interface LeaderboardEntry {
   fireBonusPoints: number;
   miraclePoints: number;
   bigPickPoints: number;
-  perfectDayBonus: number;
+  /** Fun stat only — no longer adds to total points */
+  perfectDaysCount: number;
   manualAdjustments: number;
   exactScores: number;
   correctResults: number;
@@ -319,6 +320,9 @@ export function getMaxMatchPoints(
     | "home_win_bonus"
     | "draw_bonus"
     | "away_win_bonus"
+    | "home_implied_probability"
+    | "draw_implied_probability"
+    | "away_implied_probability"
     | "home_advance_bonus"
     | "away_advance_bonus"
   >,

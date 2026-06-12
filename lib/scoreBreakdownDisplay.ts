@@ -5,21 +5,24 @@ import { EXACT_SCORE_BONUS } from "./scoreCloseness";
 
 export function outcomeBonusLine(bonus: number): string | null {
   if (bonus <= 0) return null;
-  if (bonus >= 6) return `Miracle bonus +${bonus}`;
-  return `Hard pick bonus +${bonus}`;
+  return `Hard pick +${bonus}`;
 }
 
 export function formatMatchScoreBreakdownLines(
   match: Pick<Match, "stage">,
   result: Pick<
     ScoreMatchResult,
-    "breakdown" | "exactScore" | "knockoutCorrect" | "correctResult"
-  >,
-  scoreError: number
+    "breakdown" | "exactScore" | "knockoutCorrect" | "correctResult" | "points"
+  >
 ): string[] {
-  const { breakdown } = result;
-  if (breakdown.total <= 0) return [];
+  if (result.breakdown.total <= 0 && result.points <= 0) {
+    if (isKnockoutStage(match.stage)) {
+      return ["Wrong advancer · 0"];
+    }
+    return ["Wrong result · 0"];
+  }
 
+  const { breakdown } = result;
   const lines: string[] = [];
 
   if (isKnockoutStage(match.stage)) {
@@ -35,9 +38,6 @@ export function formatMatchScoreBreakdownLines(
 
   if (result.exactScore) {
     lines.push(`Exact score +${EXACT_SCORE_BONUS}`);
-  } else if (breakdown.scoreClosenessBonus > 0) {
-    if (scoreError === 1) lines.push("One goal off +2");
-    else if (scoreError === 2) lines.push("Two goals off +1");
   }
 
   if (breakdown.fireBonus > 0) {

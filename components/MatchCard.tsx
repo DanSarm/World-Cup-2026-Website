@@ -9,7 +9,6 @@ import { getStageLabel, isKnockoutStage } from "@/lib/types";
 import type { Match, MatchPrediction, Team } from "@/lib/types";
 import { previewPickRewards, DEFAULT_SCORING_CONFIG, type ScoringConfig } from "@/lib/scoringConfig";
 import { scoreMatchPrediction } from "@/lib/scoring";
-import { scoreError } from "@/lib/scoreCloseness";
 import { formatMatchScoreBreakdownLines } from "@/lib/scoreBreakdownDisplay";
 import { hasSavedPick, getEffectiveMatchPrediction } from "@/lib/pickUtils";
 import {
@@ -218,25 +217,13 @@ export function MatchCard({
   const liveBreakdownLines = useMemo(() => {
     if (!livePointsPreview || !effectivePrediction) return null;
     if (match.home_score === null || match.away_score === null) return null;
-    const error = scoreError(
-      effectivePrediction.pred_home_score,
-      effectivePrediction.pred_away_score,
-      match.home_score,
-      match.away_score
-    );
-    return formatMatchScoreBreakdownLines(match, livePointsPreview, error);
+    return formatMatchScoreBreakdownLines(match, livePointsPreview);
   }, [livePointsPreview, effectivePrediction, match]);
 
   const scoreBreakdownLines = useMemo(() => {
     if (!finalScoreResult || !effectivePrediction) return null;
     if (match.home_score === null || match.away_score === null) return null;
-    const error = scoreError(
-      effectivePrediction.pred_home_score,
-      effectivePrediction.pred_away_score,
-      match.home_score,
-      match.away_score
-    );
-    return formatMatchScoreBreakdownLines(match, finalScoreResult, error);
+    return formatMatchScoreBreakdownLines(match, finalScoreResult);
   }, [finalScoreResult, effectivePrediction, match]);
 
   return (

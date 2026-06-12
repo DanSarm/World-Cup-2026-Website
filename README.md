@@ -121,7 +121,7 @@ Live scores **do not** run on a Vercel cron. Pages poll only while a match may b
 
 ## Scoring
 
-- Group match: up to **7+ bonus pts** (3 result + 3 exact + 1 margin + outcome bonus for underdog/draw picks)
+- Group match: up to **18 pts** (3 result + outcome bonus + 5 exact + fire bonus)
 - Knockout match: stage points + exact score + advance bonus for underdog picks
 - Perfect day bonus: **+5 pts** (2+ matches, all correct)
 - Before Cup + Finals Challenge have separate point tables

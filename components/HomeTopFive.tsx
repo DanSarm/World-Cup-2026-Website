@@ -6,6 +6,7 @@ import type { LeaderboardEntry } from "@/lib/types";
 import { filterLeaderboard, type LeaderboardFilter } from "@/lib/leaderboardFilter";
 import { formatMoney } from "@/lib/payouts";
 import { mergeLeaderboard, useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
+import { useAnyMatchPollEnabled } from "@/lib/hooks/useMatchPollEnabled";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
 import { RankMedal } from "./PlaceMedal";
@@ -13,7 +14,12 @@ import { RankMedal } from "./PlaceMedal";
 interface HomeTopFiveProps {
   initialEntries: LeaderboardEntry[];
   prizePool: number;
-  /** Poll for live score updates only while a match may be in play. */
+  /** Match list used to detect in-play windows for polling. */
+  matches?: Pick<
+    import("@/lib/types").Match,
+    "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
+  >[];
+  /** @deprecated use matches — kept for SSR pages that only pass the flag */
   pollLive?: boolean;
   /** SSR hint before the first live poll returns. */
   initialHasLiveScoring?: boolean;
@@ -22,10 +28,13 @@ interface HomeTopFiveProps {
 export function HomeTopFive({
   initialEntries,
   prizePool,
-  pollLive = false,
+  matches = [],
+  pollLive: pollLiveProp = false,
   initialHasLiveScoring = false,
 }: HomeTopFiveProps) {
   const [filter, setFilter] = useState<LeaderboardFilter>("paid");
+  const pollLiveFromMatches = useAnyMatchPollEnabled(matches);
+  const pollLive = matches.length > 0 ? pollLiveFromMatches : pollLiveProp;
   const { data } = useLiveRefresh(pollLive);
 
   const hasLive = data?.hasLiveScoring ?? initialHasLiveScoring;
@@ -87,7 +96,11 @@ export function HomeTopFive({
               : entry.totalPoints;
 
           return (
-            <div key={entry.playerId} className="lb-row lb-row--compact">
+            <Link
+              key={entry.playerId}
+              href={`/player/${entry.playerId}`}
+              className="lb-row lb-row--compact lb-row-link block"
+            >
               <span className="lb-row-rank">
                 {entry.rank <= 3 ? (
                   <RankMedal rank={entry.rank} trophySize="compact" />
@@ -126,7 +139,7 @@ export function HomeTopFive({
                     </span>
                   )}
               </span>
-            </div>
+            </Link>
           );
         })}
         {entries.length === 0 && (

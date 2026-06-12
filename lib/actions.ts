@@ -387,17 +387,6 @@ export async function adminUpdateSettingsAction(formData: FormData) {
       ),
     },
     {
-      key: "perfect_day_bonus_enabled",
-      value: formData.get("perfect_day_bonus_enabled") === "on",
-    },
-    {
-      key: "perfect_day_bonus_points",
-      value: Math.max(
-        0,
-        Math.min(20, Number(formData.get("perfect_day_bonus_points")) || 5)
-      ),
-    },
-    {
       key: "odds_lock_hours_before_kickoff",
       value: Math.max(
         0,

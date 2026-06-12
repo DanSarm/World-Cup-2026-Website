@@ -1,3 +1,4 @@
+import { parseISO } from "date-fns";
 import type {
   ActualTournamentResults,
   BigPrediction,
@@ -25,11 +26,10 @@ import {
   DEFAULT_SCORING_CONFIG,
 } from "./scoringConfig";
 import {
-  closenessBonus,
   EXACT_SCORE_BONUS,
   scoreError,
 } from "./scoreCloseness";
-import { championProbabilityToLongshotBonus } from "./odds/math";
+import { resolveGroupOutcomeBonuses, championProbabilityToLongshotBonus } from "./odds/math";
 import {
   calculateTeamTournamentValue,
   tournamentPlacePoints,
@@ -74,10 +74,8 @@ export interface ScoreMatchResult {
 export interface ScoreBreakdown {
   basePoints: number;
   exactScoreBonus: number;
-  scoreClosenessBonus: number;
   outcomeBonus: number;
   fireBonus: number;
-  perfectDayBonus: number;
   total: number;
 }
 
@@ -85,12 +83,21 @@ export { DEFAULT_SCORING_CONFIG, scoringConfigFromSettings };
 export type { ScoringConfig };
 
 function groupOutcomeBonus(
-  match: Pick<Match, "home_win_bonus" | "draw_bonus" | "away_win_bonus">,
+  match: Pick<
+    Match,
+    | "home_win_bonus"
+    | "draw_bonus"
+    | "away_win_bonus"
+    | "home_implied_probability"
+    | "draw_implied_probability"
+    | "away_implied_probability"
+  >,
   actualResult: "home" | "away" | "draw"
 ): number {
-  if (actualResult === "home") return match.home_win_bonus ?? 0;
-  if (actualResult === "draw") return match.draw_bonus ?? 0;
-  return match.away_win_bonus ?? 0;
+  const bonuses = resolveGroupOutcomeBonuses(match);
+  if (actualResult === "home") return bonuses.home;
+  if (actualResult === "draw") return bonuses.draw;
+  return bonuses.away;
 }
 
 function knockoutAdvanceBonus(
@@ -120,6 +127,9 @@ export function scoreMatchPrediction(
     | "home_win_bonus"
     | "draw_bonus"
     | "away_win_bonus"
+    | "home_implied_probability"
+    | "draw_implied_probability"
+    | "away_implied_probability"
     | "home_advance_bonus"
     | "away_advance_bonus"
   >,
@@ -133,10 +143,8 @@ export function scoreMatchPrediction(
   const emptyBreakdown: ScoreBreakdown = {
     basePoints: 0,
     exactScoreBonus: 0,
-    scoreClosenessBonus: 0,
     outcomeBonus: 0,
     fireBonus: 0,
-    perfectDayBonus: 0,
     total: 0,
   };
 
@@ -190,7 +198,6 @@ export function scoreMatchPrediction(
     const basePoints = getKnockoutAdvancePoints(match.stage);
     const outcomeBonus = knockoutAdvanceBonus(match, actualWinner);
     let exactScoreBonus = 0;
-    let scoreClosenessBonus = 0;
     let fireBonus = 0;
     let points = basePoints + outcomeBonus;
 
@@ -206,9 +213,6 @@ export function scoreMatchPrediction(
         enabled: scoringConfig.exactScoreFireBonusEnabled,
       });
       points += fireBonus;
-    } else {
-      scoreClosenessBonus = closenessBonus(error);
-      points += scoreClosenessBonus;
     }
 
     return {
@@ -221,10 +225,8 @@ export function scoreMatchPrediction(
       breakdown: {
         basePoints,
         exactScoreBonus,
-        scoreClosenessBonus,
         outcomeBonus,
         fireBonus,
-        perfectDayBonus: 0,
         total: points,
       },
     };
@@ -241,7 +243,6 @@ export function scoreMatchPrediction(
   const outcomeBonus = groupOutcomeBonus(match, actualResult);
   const basePoints = 3;
   let exactScoreBonus = 0;
-  let scoreClosenessBonus = 0;
   let fireBonus = 0;
   let points = basePoints + outcomeBonus;
 
@@ -257,9 +258,6 @@ export function scoreMatchPrediction(
       enabled: scoringConfig.exactScoreFireBonusEnabled,
     });
     points += fireBonus;
-  } else {
-    scoreClosenessBonus = closenessBonus(error);
-    points += scoreClosenessBonus;
   }
 
   points = capGroupMatchPoints(points, scoringConfig);
@@ -274,72 +272,109 @@ export function scoreMatchPrediction(
     breakdown: {
       basePoints,
       exactScoreBonus,
-      scoreClosenessBonus,
       outcomeBonus,
       fireBonus,
-      perfectDayBonus: 0,
       total: points,
     },
   };
 }
 
-export function calculatePerfectDayBonuses(
-  matches: Match[],
-  predictions: MatchPrediction[],
-  playerIds: string[],
-  scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
-): Map<string, number> {
-  const bonuses = new Map<string, number>();
-  if (!scoringConfig.perfectDayBonusEnabled) return bonuses;
-
-  const finalMatches = matches.filter((m) => isMatchDecidedForScoring(m));
+function groupFinalizedMatchesByDisplayDate(matches: Match[]): Map<string, Match[]> {
   const byDate = new Map<string, Match[]>();
-  for (const m of finalMatches) {
+  for (const m of matches) {
+    if (!isMatchDecidedForScoring(m)) continue;
     const date = matchDateKey(m.kickoff_at);
-    if (!date) continue;
+    if (!date || date === "tba") continue;
     const list = byDate.get(date) ?? [];
     list.push(m);
     byDate.set(date, list);
   }
+  return byDate;
+}
 
+function buildConfirmedPredictionIndex(
+  predictions: MatchPrediction[]
+): Map<string, MatchPrediction> {
   const predByPlayerMatch = new Map<string, MatchPrediction>();
   for (const p of predictions) {
     if (isConfirmedPick(p)) {
       predByPlayerMatch.set(`${p.player_id}:${p.match_id}`, p);
     }
   }
+  return predByPlayerMatch;
+}
 
-  for (const playerId of playerIds) {
-    for (const [, dayMatches] of byDate) {
-      if (dayMatches.length < 2) continue;
+function wasPickSubmittedBeforeKickoff(
+  pred: MatchPrediction,
+  match: Pick<Match, "kickoff_at">
+): boolean {
+  if (!match.kickoff_at) return true;
+  const submittedAt = pred.submitted_at ?? pred.updated_at;
+  if (!submittedAt) return true;
+  return parseISO(submittedAt).getTime() <= parseISO(match.kickoff_at).getTime();
+}
 
-      let allCorrect = true;
-      let allPicked = true;
+function isPerfectDayForPlayer(
+  playerId: string,
+  dayMatches: Match[],
+  predByPlayerMatch: Map<string, MatchPrediction>,
+  scoringConfig: ScoringConfig
+): boolean {
+  if (dayMatches.length < 2) return false;
 
-      for (const m of dayMatches) {
-        const pred = predByPlayerMatch.get(`${playerId}:${m.id}`);
-        if (!pred) {
-          allPicked = false;
-          break;
-        }
-        const result = scoreMatchPrediction(m, pred, scoringConfig);
-        if (!result.correctResult) {
-          allCorrect = false;
-          break;
-        }
-      }
-
-      if (allPicked && allCorrect) {
-        const dayBonus = Math.min(dayMatches.length, 5);
-        bonuses.set(
-          playerId,
-          (bonuses.get(playerId) ?? 0) + dayBonus
-        );
-      }
-    }
+  for (const m of dayMatches) {
+    const pred = predByPlayerMatch.get(`${playerId}:${m.id}`);
+    if (!pred || !isConfirmedPick(pred)) return false;
+    if (!wasPickSubmittedBeforeKickoff(pred, m)) return false;
+    const result = scoreMatchPrediction(m, pred, scoringConfig);
+    if (!result.correctResult) return false;
   }
 
-  return bonuses;
+  return true;
+}
+
+/** Perfect Day counts per player — stat/highlight only, awards 0 points. */
+export function calculatePerfectDayCounts(
+  matches: Match[],
+  predictions: MatchPrediction[],
+  playerIds: string[],
+  scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const byDate = groupFinalizedMatchesByDisplayDate(matches);
+  const predByPlayerMatch = buildConfirmedPredictionIndex(predictions);
+
+  for (const playerId of playerIds) {
+    let count = 0;
+    for (const [, dayMatches] of byDate) {
+      if (
+        isPerfectDayForPlayer(
+          playerId,
+          dayMatches,
+          predByPlayerMatch,
+          scoringConfig
+        )
+      ) {
+        count++;
+      }
+    }
+    if (count > 0) counts.set(playerId, count);
+  }
+
+  return counts;
+}
+
+/** @deprecated Perfect Day no longer awards points — always returns an empty map. */
+export function calculatePerfectDayBonuses(
+  matches: Match[],
+  predictions: MatchPrediction[],
+  playerIds: string[],
+  _scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
+): Map<string, number> {
+  void matches;
+  void predictions;
+  void playerIds;
+  return new Map();
 }
 
 export function calculateBigPredictionPoints(
@@ -549,7 +584,7 @@ export function calculateLeaderboard(
   const finalMatch = matches.find((m) => m.stage === "final");
   const scoringConfig = scoringConfigFromSettings(settings);
   const confirmedPredictions = predictions.filter(isConfirmedPick);
-  const perfectDayBonuses = calculatePerfectDayBonuses(
+  const perfectDayCounts = calculatePerfectDayCounts(
     matches,
     confirmedPredictions,
     players.map((p) => p.id),
@@ -660,11 +695,11 @@ export function calculateLeaderboard(
       ? calculateFinalsChallengePoints(finalsPred, actualResults)
       : 0;
 
-    const perfectDayBonus = perfectDayBonuses.get(player.id) ?? 0;
     const manualAdjustments = adjByPlayer.get(player.id) ?? 0;
+    const perfectDaysCount = perfectDayCounts.get(player.id) ?? 0;
 
     const totalPoints =
-      matchPoints + beforeCupPoints + perfectDayBonus + manualAdjustments;
+      matchPoints + beforeCupPoints + manualAdjustments;
     const provisionalTotalPoints = totalPoints + livePoints;
 
     let closestFinalScoreDiff: number | null = null;
@@ -694,7 +729,7 @@ export function calculateLeaderboard(
       fireBonusPoints,
       miraclePoints: hardPickBonusPoints + fireBonusPoints,
       bigPickPoints: beforeCupPoints,
-      perfectDayBonus,
+      perfectDaysCount,
       manualAdjustments,
       exactScores,
       correctResults,
@@ -793,41 +828,9 @@ export function countPerfectDays(
   playerId: string,
   scoringConfig: ScoringConfig = DEFAULT_SCORING_CONFIG
 ): number {
-  if (!scoringConfig.perfectDayBonusEnabled) return 0;
-
-  const finalMatches = matches.filter((m) => isMatchDecidedForScoring(m));
-  const byDate = new Map<string, Match[]>();
-  for (const m of finalMatches) {
-    const date = matchDateKey(m.kickoff_at);
-    if (!date) continue;
-    const list = byDate.get(date) ?? [];
-    list.push(m);
-    byDate.set(date, list);
-  }
-
-  let count = 0;
-  for (const [, dayMatches] of byDate) {
-    if (dayMatches.length < 2) continue;
-    let allCorrect = true;
-    let allPicked = true;
-    for (const m of dayMatches) {
-      const pred = predictions.find(
-        (p) =>
-          p.player_id === playerId &&
-          p.match_id === m.id &&
-          isConfirmedPick(p)
-      );
-      if (!pred) {
-        allPicked = false;
-        break;
-      }
-      const result = scoreMatchPrediction(m, pred, scoringConfig);
-      if (!result.correctResult) {
-        allCorrect = false;
-        break;
-      }
-    }
-    if (allPicked && allCorrect) count++;
-  }
-  return count;
+  return (
+    calculatePerfectDayCounts(matches, predictions, [playerId], scoringConfig).get(
+      playerId
+    ) ?? 0
+  );
 }

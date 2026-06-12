@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { LeaderboardEntry } from "@/lib/types";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
@@ -72,10 +73,11 @@ export function LeaderboardTable({
         : entry.totalPoints;
 
     return (
-      <li
-        key={entry.playerId}
-        className={`lb-entry ${podiumClass(entry.rank)}`}
-      >
+      <li key={entry.playerId}>
+        <Link
+          href={`/player/${entry.playerId}`}
+          className={`lb-entry lb-entry-link ${podiumClass(entry.rank)}`}
+        >
         <span
           className={`lb-entry-rank ${
             entry.rank <= 3 ? "lb-entry-rank--medal" : ""
@@ -109,6 +111,12 @@ export function LeaderboardTable({
             {entry.exactScores > 0 && (
               <span> · {entry.exactScores} exact</span>
             )}
+            {entry.perfectDaysCount > 0 && (
+              <span className="text-mexico font-semibold">
+                {" "}
+                · Perfect Day{entry.perfectDaysCount > 1 ? ` ×${entry.perfectDaysCount}` : ""} 🎉
+              </span>
+            )}
           </p>
         </div>
 
@@ -135,6 +143,7 @@ export function LeaderboardTable({
             </p>
           )}
         </div>
+        </Link>
       </li>
     );
   };

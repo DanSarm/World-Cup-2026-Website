@@ -3,6 +3,7 @@ import { isKnockoutStage } from "./types";
 import { calculateExactScoreFireBonus } from "./fireBonus";
 import { pickPreviewLabel } from "./fireBonus";
 import { EXACT_SCORE_BONUS } from "./scoreCloseness";
+import { resolveGroupOutcomeBonuses } from "./odds/math";
 
 export interface ScoringConfig {
   exactScoreFireBonusEnabled: boolean;
@@ -57,6 +58,9 @@ export function outcomeBonusForScoreline(
     | "home_win_bonus"
     | "draw_bonus"
     | "away_win_bonus"
+    | "home_implied_probability"
+    | "draw_implied_probability"
+    | "away_implied_probability"
     | "home_advance_bonus"
     | "away_advance_bonus"
     | "home_team_id"
@@ -78,9 +82,10 @@ export function outcomeBonusForScoreline(
   }
 
   const result = getResult(homeScore, awayScore);
-  if (result === "home") return match.home_win_bonus ?? 0;
-  if (result === "draw") return match.draw_bonus ?? 0;
-  return match.away_win_bonus ?? 0;
+  const bonuses = resolveGroupOutcomeBonuses(match);
+  if (result === "home") return bonuses.home;
+  if (result === "draw") return bonuses.draw;
+  return bonuses.away;
 }
 
 export function capGroupMatchPoints(
@@ -184,17 +189,17 @@ export function maxPossibleMatchPoints(
     | "home_win_bonus"
     | "draw_bonus"
     | "away_win_bonus"
+    | "home_implied_probability"
+    | "draw_implied_probability"
+    | "away_implied_probability"
     | "home_advance_bonus"
     | "away_advance_bonus"
   >,
   config: ScoringConfig = DEFAULT_SCORING_CONFIG
 ): number {
   if (match.stage === "group") {
-    const maxOutcome = Math.max(
-      match.home_win_bonus ?? 0,
-      match.draw_bonus ?? 0,
-      match.away_win_bonus ?? 0
-    );
+    const bonuses = resolveGroupOutcomeBonuses(match);
+    const maxOutcome = Math.max(bonuses.home, bonuses.draw, bonuses.away);
     const raw =
       3 +
       EXACT_SCORE_BONUS +

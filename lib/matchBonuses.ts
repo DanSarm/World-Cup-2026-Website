@@ -1,4 +1,5 @@
 import { isKnockoutStage, type Match } from "./types";
+import { resolveGroupOutcomeBonuses } from "./odds/math";
 import {
   previewPickRewards,
   DEFAULT_SCORING_CONFIG,
@@ -30,17 +31,18 @@ export function getBonusPills(match: Match): BonusPill[] {
       });
     }
   } else {
-    if ((match.home_win_bonus ?? 0) > 0) {
+    const bonuses = resolveGroupOutcomeBonuses(match);
+    if (bonuses.home > 0) {
       pills.push({
-        label: `${shortLabel(match.home_team?.short_name, match.home_label)} +${match.home_win_bonus}`,
+        label: `${shortLabel(match.home_team?.short_name, match.home_label)} +${bonuses.home}`,
       });
     }
-    if ((match.draw_bonus ?? 0) > 0) {
-      pills.push({ label: `Draw +${match.draw_bonus}` });
+    if (bonuses.draw > 0) {
+      pills.push({ label: `Draw +${bonuses.draw}` });
     }
-    if ((match.away_win_bonus ?? 0) > 0) {
+    if (bonuses.away > 0) {
       pills.push({
-        label: `${shortLabel(match.away_team?.short_name, match.away_label)} +${match.away_win_bonus}`,
+        label: `${shortLabel(match.away_team?.short_name, match.away_label)} +${bonuses.away}`,
       });
     }
   }
@@ -111,9 +113,5 @@ export function projectPickPoints(
   return {
     resultPoints: preview.resultOnlyPoints,
     exactPoints: preview.maxPoints,
-    withMarginPoints:
-      match.stage === "group" && predHome !== predAway
-        ? preview.resultOnlyPoints + 2
-        : preview.resultOnlyPoints,
   };
 }

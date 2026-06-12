@@ -110,7 +110,7 @@ assert(score(5, 0, 5, 0) === 10, "Switzerland 5-0 exact = 10");
 assert(score(1, 1, 1, 1) === 12, "Draw 1-1 exact = 12");
 assert(score(0, 1, 0, 1) === 16, "Qatar 1-0 exact = 16");
 assert(score(0, 5, 0, 5) === 18, "Qatar 5-0 exact = 18");
-assert(score(1, 3, 0, 2) === 10, "Qatar 3-1 vs pick 2-0 = 10");
+assert(score(1, 3, 0, 2) === 9, "Qatar 3-1 vs pick 2-0 = 9");
 
 const preview = previewPickRewards(suiQat, 5, 0, DEFAULT_SCORING_CONFIG);
 assert(preview.maxPoints === 10, "preview Switzerland 5-0 max = 10");

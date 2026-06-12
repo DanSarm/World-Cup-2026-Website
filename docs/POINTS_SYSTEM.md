@@ -12,8 +12,9 @@ Each player’s **total points** = sum of:
 |----------|-------------|
 | **Match pick points** | Points from individual game score predictions (group + knockout) |
 | **Tournament Picks (podium)** | Champion / runner-up / 3rd place (market-based, scored at end of tournament) |
-| **Perfect Day bonus** | min(matches that day, 5) per qualifying day (optional, on by default) |
 | **Manual adjustments** | Admin-added/subtracted points (if any) |
+
+**Perfect Day** is tracked as a fun highlight/badge only — it awards **0 points** toward the leaderboard.
 
 **Not included in main leaderboard total:** “Finals Challenge” is tracked separately (legacy side game).
 
@@ -34,7 +35,9 @@ During a **live** match, the site may show **provisional** totals that include p
 
 For **group stage** matches, if your predicted **outcome** (home win / away win / draw) does not match the actual outcome, you get **0 points**.
 
-For **knockout** matches, you must pick the **correct advancing team**. Wrong team = **0 points total** — no exact score or closeness credit.
+For **knockout** matches, you must pick the **correct advancing team**. Wrong team = **0 points total** — no exact score credit.
+
+**Core principle:** Only an **exact score** earns extra scoreline points (+5 exact + optional fire). Correct result with the wrong score earns base + outcome bonus only. There are no one-goal-off, two-goals-off, or goal-difference margin bonuses.
 
 ---
 
@@ -74,43 +77,41 @@ Implied win probability (no-vig) → bonus points:
 
 | Implied probability | Bonus |
 |---------------------|-------|
-| ≥ 50% | 0 |
-| ≥ 35% | +1 |
-| ≥ 20% | +2 |
+| ≥ 35% | 0 |
+| ≥ 25% | 0 |
+| ≥ 20% | +1 |
 | ≥ 10% | +4 |
 | ≥ 5%  | +6 |
 | < 5%  | +8 |
 
-Admin can also set bonuses manually per match.
+**Competitive no-bonus rule (group stage, step 1):** If the favorite is under **50%** and **home, draw, and away are each at least 25%**, every outcome bonus is **0**. Examples: Korea 37/30/33 → all +0; Netherlands 47/27/26 → all +0.
 
-**Labels shown in UI:** Sneaky +1, Brave +2, Shock +4, Miracle +6, Impossible +8
+If any outcome is below 25%, the competitive rule does **not** apply and step 2 table runs per outcome. Example: USA 48/28/24 → USA +0, Draw +0, Paraguay +1. Switzerland 78/15/7 → Switzerland +0, Draw +4, Qatar +6.
 
-### Step 3 — Score closeness bonus (optional)
+Admin can also set bonuses manually per match (manual entries without implied probabilities use stored bonus values as-is).
 
-Total goal error:
+**Labels shown in UI:** Sneaky +1, Shock +4, Miracle +6, Impossible +8
+
+### Step 3 — Exact score bonus (exact only)
+
+Only when your predicted score **exactly** matches the actual score:
 
 ```
-score_error = |pred_home − actual_home| + |pred_away − actual_away|
++5 exact score bonus
++ fire bonus (optional, see Step 4)
 ```
 
-| score_error | Bonus |
-|-------------|-------|
-| 0 (exact) | +5 exact score bonus (see Step 4 for fire) |
-| 1 | +2 |
-| 2 | +1 |
-| 3+ | +0 |
+If the result is correct but the score is wrong, you get **no** extra scoreline points — only the Step 2 base (3 + outcome bonus).
 
 **Examples (actual Mexico 2–0, home win bonus = 0):**
 
-| Pick | Outcome correct? | score_error | Points |
-|------|------------------|-------------|--------|
-| 2–0 | ✓ | 0 | 3 + 5 = **8** |
-| 3–0, 2–1, 1–0 | ✓ | 1 | 3 + 2 = **5** |
-| 3–1 | ✓ | 2 | 3 + 1 = **4** |
-| 4–2 | ✓ | 4 | 3 + 0 = **3** |
-| 1–1 | ✗ | — | **0** |
-
-The old **margin bonus** (+1 for matching goal difference) has been removed.
+| Pick | Outcome correct? | Points |
+|------|------------------|--------|
+| 2–0 | ✓ exact | 3 + 5 = **8** |
+| 3–0, 2–1, 1–0 | ✓ | **3** |
+| 3–1, 4–2 | ✓ | **3** |
+| 1–1, 0–1 | ✗ | **0** |
+| No pick | — | **0** |
 
 ### Step 4 — Exact Score Fire Bonus (optional, exact only)
 
@@ -184,14 +185,12 @@ Typical synced odds for this opener (approximate):
 | Pick | Breakdown | Total |
 |------|-----------|-------|
 | **2–0** | 3 base + 0 home bonus + 5 exact + 0 fire | **8** |
-| **3–0, 2–1, 1–0** | 3 base + 0 home bonus + 2 closeness (error 1) | **5** |
-| **3–1** | 3 base + 0 home bonus + 1 closeness (error 2) | **4** |
-| **4–2** | 3 base + 0 home bonus | **3** |
+| **3–0, 2–1, 1–0, 3–1, 4–2** | 3 base + 0 home bonus | **3** |
 | **1–1** | Wrong outcome (draw vs home win) | **0** |
 | **0–1** | Wrong outcome (away win) | **0** |
 | **No pick** | Not submitted | **0** |
 
-If Mexico’s home win bonus were **+1** (e.g. ~40% implied), exact 2–0 would be **7**, and 3–1 would be **5**.
+If Mexico’s home win bonus were **+1** (e.g. ~40% implied), exact 2–0 would be **9**, and 3–0 would still be **4** (3 + 1).
 
 **Exact 2–0 fire bonus = 0** because Mexico is the favorite (outcome_bonus 0) and winning margin is only 2.
 
@@ -231,7 +230,9 @@ If exact score **and** correct advancing team:
 + fire bonus (same fire rules as group, using advance_bonus as outcome_bonus)
 ```
 
-If correct advancing team but not exact, apply the same **score closeness** table as group stage (+2 / +1 / +0).
+If correct advancing team but not exact, you receive **round base + advance bonus only** — no extra scoreline points.
+
+Penalty shootout goals do **not** count toward the exact score. If a knockout match ends tied after extra time, the stored score is the tied scoreline; your predicted score must match that tied score and your predicted advancing team must be correct to earn exact score points.
 
 **Example — Final, actual 2–1, pick 2–1, correct winner, advance_bonus 0:**
 
@@ -241,20 +242,18 @@ If correct advancing team but not exact, apply the same **score closeness** tabl
 
 ---
 
-## Perfect Day bonus
+## Perfect Day (highlight only)
 
-**Default: enabled.**
-
-```
-perfect_day_bonus = min(number_of_matches_that_day, 5)
-```
+Perfect Day is a **fun stat**, not a point bonus. It awards **0 points**.
 
 Rules:
 
-1. Look at all **final** matches on the same **display calendar date** (America/New_York, matching the app UI — not UTC).
+1. Look at all **finalized** matches on the same **display calendar date** (America/New_York, matching the app UI — not UTC).
 2. Need **at least 2 matches** that day.
-3. You must have a **confirmed pick** on **every** match that day.
+3. You must have a **confirmed pick submitted before kickoff** on **every** match that day.
 4. You must get **correct result** on **every** match that day (group: right W/D/L; knockout: right advancer).
+
+When all four conditions are met, `perfect_days_count` increments and the player may show **Perfect Day 🎉** on the leaderboard or profile. Pool Highlights can still feature the Perfect Day Club.
 
 ---
 
@@ -368,6 +367,10 @@ If players tie in points, prize money for the tied positions is **pooled and spl
 
 ## Pick preview labels (UI only)
 
+**Group stage:** max points = 3 + outcome bonus + 5 exact + predicted fire bonus (capped at 18).
+
+**Knockout:** max points = round base + advance bonus + 5 exact + predicted fire bonus.
+
 Based on **maximum possible points** if that exact scoreline hits:
 
 | Max points | Label |
@@ -402,29 +405,22 @@ While a match is in progress with a synced score:
 |---------|---------|--------|
 | `exact_score_fire_bonus_enabled` | true | Toggle fire bonus |
 | `group_stage_match_point_cap` | 18 | Max points per group game |
-| `perfect_day_bonus_enabled` | true | Toggle perfect day |
 
-Perfect day bonus is `min(matches_that_day, 5)` — not a flat configurable amount.
+Perfect Day is always tracked as a highlight stat; it does not award points.
 
 ---
 
 ## Quick reference — group stage formula
 
 ```
-score_error = |pred_home - actual_home| + |pred_away - actual_away|
-
 IF wrong outcome (home/away/draw):
   points = 0
 ELSE:
   points = 3
   points += outcome_bonus_for_actual_result   // 0–8 from odds
-  IF score_error == 0:
+  IF exact score:
     points += 5
     points += fire_bonus                      // 0–4 typical
-  ELSE IF score_error == 1:
-    points += 2
-  ELSE IF score_error == 2:
-    points += 1
   points = min(points, group_stage_cap)       // default 18
 ```
 
@@ -437,12 +433,8 @@ IF wrong advancing team:
   points = 0
 ELSE:
   points = round_base + advance_bonus
-  IF score_error == 0:
+  IF exact score:
     points += 5 + fire_bonus
-  ELSE IF score_error == 1:
-    points += 2
-  ELSE IF score_error == 2:
-    points += 1
 ```
 
 ---

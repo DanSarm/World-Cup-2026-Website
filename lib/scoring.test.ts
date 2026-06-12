@@ -1,6 +1,8 @@
 import {
   scoreMatchPrediction,
   calculatePerfectDayBonuses,
+  calculatePerfectDayCounts,
+  countPerfectDays,
   calculateBigPredictionPoints,
   calculatePodiumPoints,
 } from "./scoring";
@@ -73,16 +75,16 @@ assert(
   scoreMatchPrediction(
     { ...groupMatch, home_score: 1, away_score: 0 },
     { pred_home_score: 2, pred_away_score: 1, pred_winner_team_id: null }
-  ).points === 4,
-  "correct winner, two goals off = 4"
+  ).points === 3,
+  "correct winner, two goals off = 3"
 );
 
 assert(
   scoreMatchPrediction(
     { ...groupMatch, home_score: 3, away_score: 1 },
     { pred_home_score: 2, pred_away_score: 1, pred_winner_team_id: null }
-  ).points === 5,
-  "correct winner, one goal off = 5"
+  ).points === 3,
+  "correct winner, one goal off = 3"
 );
 
 assert(
@@ -98,8 +100,8 @@ assert(
   scoreMatchPrediction(
     { ...groupMatch, home_score: 0, away_score: 0 },
     { pred_home_score: 1, pred_away_score: 1, pred_winner_team_id: null }
-  ).points === 4,
-  "non-exact draw, two goals off = 4"
+  ).points === 3,
+  "non-exact draw, two goals off = 3"
 );
 
 assert(
@@ -122,8 +124,8 @@ assert(
   scoreMatchPrediction(
     { ...groupMatch, home_score: 1, away_score: 1, home_win_bonus: 0, draw_bonus: 4, away_win_bonus: 6 },
     { pred_home_score: 0, pred_away_score: 0, pred_winner_team_id: null }
-  ).points === 8,
-  "correct draw non-exact with draw bonus = 8"
+  ).points === 7,
+  "correct draw non-exact with draw bonus = 7"
 );
 
 assert(
@@ -163,12 +165,13 @@ const mexPick = (h: number, a: number) =>
   }).points;
 
 assert(mexPick(2, 0) === 8, "Mexico 2-0 exact = 8");
-assert(mexPick(3, 0) === 5, "Mexico 3-0 one goal off = 5");
-assert(mexPick(2, 1) === 5, "Mexico 2-1 one goal off = 5");
-assert(mexPick(1, 0) === 5, "Mexico 1-0 one goal off = 5");
-assert(mexPick(3, 1) === 4, "Mexico 3-1 two goals off = 4");
-assert(mexPick(4, 2) === 3, "Mexico 4-2 wrong closeness = 3");
+assert(mexPick(3, 0) === 3, "Mexico 3-0 correct result only = 3");
+assert(mexPick(2, 1) === 3, "Mexico 2-1 correct result only = 3");
+assert(mexPick(1, 0) === 3, "Mexico 1-0 correct result only = 3");
+assert(mexPick(3, 1) === 3, "Mexico 3-1 correct result only = 3");
+assert(mexPick(4, 2) === 3, "Mexico 4-2 correct result only = 3");
 assert(mexPick(1, 1) === 0, "Mexico 1-1 wrong result = 0");
+assert(mexPick(0, 1) === 0, "Mexico 0-1 wrong result = 0");
 
 const koMatch: Match = {
   ...groupMatch,
@@ -215,8 +218,8 @@ assert(
       pred_away_score: 0,
       pred_winner_team_id: "bra",
     }
-  ).points === 12,
-  "knockout correct advancer one goal off = 12"
+  ).points === 10,
+  "knockout correct advancer non-exact = 10"
 );
 
 assert(
@@ -277,10 +280,18 @@ const dayPreds: MatchPrediction[] = [
   },
 ];
 
-const bonuses = calculatePerfectDayBonuses(dayMatches, dayPreds, ["player1"]);
+const perfectDayCounts = calculatePerfectDayCounts(dayMatches, dayPreds, ["player1"]);
 assert(
-  bonuses.get("player1") === 2,
-  "perfect day bonus min(matches, 5) = 2 for two-match day"
+  perfectDayCounts.get("player1") === 1,
+  "one perfect day when all picks correct on a two-match day"
+);
+assert(
+  countPerfectDays(dayMatches, dayPreds, "player1") === 1,
+  "countPerfectDays matches batch helper"
+);
+assert(
+  calculatePerfectDayBonuses(dayMatches, dayPreds, ["player1"]).size === 0,
+  "perfect day no longer awards bonus points"
 );
 
 assert(

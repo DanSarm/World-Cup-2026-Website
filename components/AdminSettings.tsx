@@ -202,33 +202,16 @@ export function AdminSettings({
             />
             Exact score fire bonus
           </label>
-          <label className="flex items-center gap-2 text-sm text-ink-muted">
-            <input
-              name="perfect_day_bonus_enabled"
-              type="checkbox"
-              defaultChecked={settings.perfect_day_bonus_enabled}
-            />
-            Perfect Day bonus (+{settings.perfect_day_bonus_points})
-          </label>
+          <p className="text-xs text-ink-muted leading-snug">
+            Perfect Day is tracked as a fun highlight only — it awards 0 points.
+          </p>
           <div>
-            <label className="label">Max group-stage match points</label>
             <input
               name="group_stage_match_point_cap"
               type="number"
               min={6}
               max={30}
               defaultValue={settings.group_stage_match_point_cap}
-              className="input-field text-sm py-2"
-            />
-          </div>
-          <div>
-            <label className="label">Perfect Day bonus points</label>
-            <input
-              name="perfect_day_bonus_points"
-              type="number"
-              min={0}
-              max={20}
-              defaultValue={settings.perfect_day_bonus_points}
               className="input-field text-sm py-2"
             />
           </div>

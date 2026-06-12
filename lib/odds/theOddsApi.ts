@@ -12,6 +12,7 @@ import {
   calculateNoVigProbabilities,
   decimalToAmerican,
   decimalToImplied,
+  groupStageOutcomeBonusesFromImplied,
   probabilityToBonus,
 } from "./math";
 import { teamNameMatches } from "./teamAliases";
@@ -325,14 +326,19 @@ export function processH2hOdds(
   const homeImplied = average(homeNoVigs);
   const drawImplied = average(drawNoVigs);
   const awayImplied = average(awayNoVigs);
+  const bonuses = groupStageOutcomeBonusesFromImplied(
+    homeImplied,
+    drawImplied,
+    awayImplied
+  );
 
   return {
     homeImplied,
     drawImplied,
     awayImplied,
-    homeBonus: probabilityToBonus(homeImplied),
-    drawBonus: probabilityToBonus(drawImplied),
-    awayBonus: probabilityToBonus(awayImplied),
+    homeBonus: bonuses.home,
+    drawBonus: bonuses.draw,
+    awayBonus: bonuses.away,
     bookmakerCount: homeNoVigs.length,
     bookmakerTitles,
     snapshots,

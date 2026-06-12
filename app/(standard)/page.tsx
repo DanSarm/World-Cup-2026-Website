@@ -124,7 +124,7 @@ export default async function HomePage() {
       <HomeTopFive
         initialEntries={leaderboard}
         prizePool={prizePool}
-        pollLive={isAnyMatchInPlayWindow(matches)}
+        matches={matches}
         initialHasLiveScoring={hasAnyDisplayableLiveScore(matches)}
       />
     </div>

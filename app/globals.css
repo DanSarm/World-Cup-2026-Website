@@ -448,6 +448,16 @@ body {
   @apply flex items-center gap-2.5 px-3.5 py-2.5 sm:px-4 sm:py-3;
 }
 
+.lb-entry-link,
+.lb-row-link {
+  @apply no-underline text-inherit transition-colors;
+}
+
+.lb-entry-link:hover,
+.lb-row-link:hover {
+  @apply bg-ink/[0.03];
+}
+
 .lb-entry--first {
   @apply gap-3 py-4 sm:py-5 sm:px-5;
 }

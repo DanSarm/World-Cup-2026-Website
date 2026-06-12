@@ -10,6 +10,7 @@ import {
   mergeLiveMatchFromPayload,
   useLiveRefresh,
 } from "@/lib/hooks/useLiveRefresh";
+import { useMatchPollEnabled } from "@/lib/hooks/useMatchPollEnabled";
 import {
   hasDisplayableLiveScore,
   isMatchInPlayWindow,
@@ -39,8 +40,7 @@ export function HomeFeaturedMatchSection({
   sectionLabel,
   totalPlayers,
 }: HomeFeaturedMatchSectionProps) {
-  const pollLive =
-    isMatchLive(initialMatch) || isMatchInPlayWindow(initialMatch);
+  const pollLive = useMatchPollEnabled(initialMatch);
   const { data } = useLiveRefresh(pollLive);
 
   const match = useMemo(
