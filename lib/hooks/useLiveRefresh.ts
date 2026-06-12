@@ -5,7 +5,7 @@ import type { LeaderboardEntry, Match, PickFormSlot } from "@/lib/types";
 import { assignCompetitionRanksImmutable } from "@/lib/competitionRank";
 
 const POLL_INTERVAL_MS = Number(
-  process.env.NEXT_PUBLIC_LIVE_POLL_INTERVAL_MS ?? "600000"
+  process.env.NEXT_PUBLIC_LIVE_POLL_INTERVAL_MS ?? "10000"
 );
 
 export interface LiveApiPayload {
@@ -64,9 +64,16 @@ export function useLiveRefresh(enabled: boolean) {
 
     void refresh();
     const id = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       mountedRef.current = false;
       window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [enabled, refresh]);
 

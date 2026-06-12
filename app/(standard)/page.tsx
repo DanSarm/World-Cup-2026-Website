@@ -29,7 +29,7 @@ export default async function HomePage() {
   ]);
 
   const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (liveMatchesInitial.length > 0) {
+  if (isAnyMatchInPlayWindow(matchesRaw)) {
     await syncLiveScores();
   }
   const matches =

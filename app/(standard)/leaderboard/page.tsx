@@ -26,7 +26,7 @@ export default async function LeaderboardPage() {
 
   const matchesRaw = await getMatchesWithTeams();
   const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (liveMatchesInitial.length > 0) {
+  if (isAnyMatchInPlayWindow(matchesRaw)) {
     await syncLiveScores();
   }
 

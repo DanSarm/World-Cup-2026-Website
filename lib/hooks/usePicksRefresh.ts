@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CommunityMatchPick } from "@/lib/data";
+import { isAnyMatchInPlayWindow } from "@/lib/matchLive";
 import type { Match, MatchPrediction } from "@/lib/types";
 
-const PICKS_POLL_INTERVAL_MS = Number(
+const LIVE_POLL_INTERVAL_MS = Number(
+  process.env.NEXT_PUBLIC_LIVE_POLL_INTERVAL_MS ?? "10000"
+);
+const IDLE_POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_PICKS_POLL_INTERVAL_MS ?? "45000"
 );
 
@@ -37,12 +41,15 @@ export function usePicksRefresh(enabled = true) {
     }
   }, [enabled]);
 
+  const liveActive = data ? isAnyMatchInPlayWindow(data.matches) : true;
+  const pollIntervalMs = liveActive ? LIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
+
   useEffect(() => {
     mountedRef.current = true;
     if (!enabled) return;
 
     void refresh();
-    const id = window.setInterval(() => void refresh(), PICKS_POLL_INTERVAL_MS);
+    const id = window.setInterval(() => void refresh(), pollIntervalMs);
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -54,7 +61,7 @@ export function usePicksRefresh(enabled = true) {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [enabled, refresh]);
+  }, [enabled, refresh, pollIntervalMs]);
 
   return { data, loading, refresh };
 }
