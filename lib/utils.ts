@@ -88,6 +88,13 @@ export function canPickMatch(match: Match): boolean {
   return !!(match.home_team_id && match.away_team_id && !isMatchLocked(match));
 }
 
+/** Match has finished — kickoff occurred and a final score is in. */
+export function isMatchPlayed(
+  match: Pick<Match, "status" | "home_team_id" | "away_team_id">
+): boolean {
+  return !!(match.home_team_id && match.away_team_id && match.status === "final");
+}
+
 /** Earliest scheduled kickoff — countdown target for tournament-wide picks. */
 export function getWorldCupKickoff(matches: Match[]): string | null {
   const kickoffs = matches

@@ -5,6 +5,7 @@ import type { ChampionOddsRow } from "@/lib/odds/championOdds";
 
 interface ChampionOddsPanelProps {
   entries: ChampionOddsRow[];
+  sourceLabel?: string;
 }
 
 function formatWinChance(probability: number): string {
@@ -13,7 +14,7 @@ function formatWinChance(probability: number): string {
   return "<1%";
 }
 
-export function ChampionOddsPanel({ entries }: ChampionOddsPanelProps) {
+export function ChampionOddsPanel({ entries, sourceLabel }: ChampionOddsPanelProps) {
   const withOdds = entries.filter((entry) => entry.impliedProbability != null);
 
   return (
@@ -24,8 +25,8 @@ export function ChampionOddsPanel({ entries }: ChampionOddsPanelProps) {
         </h2>
         <p className="text-[11px] text-ink-muted mt-0.5 leading-snug">
           {withOdds.length > 0
-            ? `${withOdds.length} teams · market win %`
-            : "Winner odds from the market"}
+            ? `${withOdds.length} teams · ${sourceLabel ?? "market win %"}`
+            : sourceLabel ?? "Winner odds from the market"}
         </p>
       </div>
 

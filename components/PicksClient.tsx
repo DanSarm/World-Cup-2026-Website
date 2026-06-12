@@ -32,8 +32,8 @@ interface PicksClientProps {
 
 const FILTERS: { key: PicksFilter; label: string }[] = [
   { key: "need", label: "Need Pick" },
-  { key: "saved", label: "Saved" },
-  { key: "open", label: "Open" },
+  { key: "past", label: "Past" },
+  { key: "picked", label: "Picked" },
   { key: "all", label: "All" },
 ];
 

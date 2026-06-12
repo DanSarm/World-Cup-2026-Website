@@ -1,7 +1,10 @@
 import { unstable_cache } from "next/cache";
+import { getSupabase } from "@/lib/supabaseServer";
 import type { Team } from "@/lib/types";
 import { isOddsApiConfigured } from "./config";
+import { getStoredCreditsRemaining } from "./quotaGuard";
 import { average, decimalToImplied } from "./math";
+import { processPolymarketWinnerMarkets } from "./polymarketChampionOdds";
 import { teamNameMatches } from "./teamAliases";
 import {
   fetchWorldCupWinnerOdds,
@@ -16,6 +19,18 @@ export interface ChampionOddsEntry {
 export interface ChampionOddsRow {
   team: Team;
   impliedProbability: number | null;
+}
+
+export type ChampionOddsSource =
+  | "odds_api"
+  | "polymarket"
+  | "stored"
+  | "none";
+
+export interface ChampionOddsResult {
+  rows: ChampionOddsRow[];
+  source: ChampionOddsSource;
+  sourceLabel: string;
 }
 
 const OUTRIGHT_MARKET_KEYS = new Set(["outrights", "outright", "h2h"]);
@@ -69,10 +84,9 @@ export function processWorldCupWinnerOdds(
     .sort((a, b) => b.impliedProbability - a.impliedProbability);
 }
 
-function topFromStoredProbabilities(
+function entriesFromStoredProbabilities(
   teams: Team[],
-  probabilities: Record<string, number> | undefined,
-  limit: number
+  probabilities: Record<string, number> | undefined
 ): ChampionOddsEntry[] {
   if (!probabilities) return [];
 
@@ -83,42 +97,96 @@ function topFromStoredProbabilities(
       return { team, impliedProbability };
     })
     .filter((row): row is ChampionOddsEntry => row !== null)
-    .sort((a, b) => b.impliedProbability - a.impliedProbability)
-    .slice(0, limit);
+    .sort((a, b) => b.impliedProbability - a.impliedProbability);
 }
 
-const getCachedWinnerEvents = unstable_cache(
-  async (): Promise<OddsApiEvent[]> => {
-    if (!isOddsApiConfigured()) return [];
-    try {
-      return await fetchWorldCupWinnerOdds();
-    } catch {
-      return [];
-    }
-  },
-  ["world-cup-winner-events"],
-  { revalidate: 86400 }
+type PolymarketEvent = {
+  title?: string;
+  markets?: Array<{
+    question?: string;
+    outcomes?: string;
+    outcomePrices?: string;
+  }>;
+};
+
+async function loadPolymarketWinnerEvent(): Promise<PolymarketEvent> {
+  const res = await fetch(
+    "https://gamma-api.polymarket.com/events/slug/world-cup-winner",
+    { next: { revalidate: 3600 } }
+  );
+  if (!res.ok) {
+    throw new Error(`Polymarket winner odds error ${res.status}`);
+  }
+  return res.json() as Promise<PolymarketEvent>;
+}
+
+const getCachedPolymarketWinnerEvent = unstable_cache(
+  loadPolymarketWinnerEvent,
+  ["world-cup-winner-polymarket-event"],
+  { revalidate: 3600 }
 );
+
+async function fetchPolymarketWinnerEvent(): Promise<PolymarketEvent> {
+  try {
+    return await getCachedPolymarketWinnerEvent();
+  } catch {
+    return loadPolymarketWinnerEvent();
+  }
+}
+
+async function fetchPolymarketWinnerEntries(
+  teams: Team[]
+): Promise<ChampionOddsEntry[]> {
+  try {
+    const event = await fetchPolymarketWinnerEvent();
+    return processPolymarketWinnerMarkets(event, teams);
+  } catch (error) {
+    console.error("fetchPolymarketWorldCupWinnerOdds:", error);
+    return [];
+  }
+}
+
+async function fetchOddsApiWinnerEntries(
+  teams: Team[]
+): Promise<ChampionOddsEntry[]> {
+  if (!isOddsApiConfigured()) return [];
+
+  const remaining = await getStoredCreditsRemaining();
+  if (remaining != null && remaining <= 0) return [];
+
+  try {
+    const events = await fetchWorldCupWinnerOdds();
+    return processWorldCupWinnerOdds(events, teams);
+  } catch (error) {
+    console.error("fetchWorldCupWinnerOdds:", error);
+    return [];
+  }
+}
+
+export async function persistChampionProbabilities(
+  ranked: ChampionOddsEntry[]
+): Promise<void> {
+  if (ranked.length === 0) return;
+
+  const value = Object.fromEntries(
+    ranked.map((entry) => [entry.team.id, entry.impliedProbability])
+  );
+  const supabase = getSupabase();
+  const now = new Date().toISOString();
+
+  await supabase.from("settings").upsert([
+    { key: "champion_probabilities", value, updated_at: now },
+    { key: "champion_odds_updated_at", value: now, updated_at: now },
+  ]);
+}
 
 function buildAllTeamChampionOdds(
   teams: Team[],
-  ranked: ChampionOddsEntry[],
-  storedProbabilities?: Record<string, number>
+  ranked: ChampionOddsEntry[]
 ): ChampionOddsRow[] {
   const probMap = new Map<string, number>();
-
   for (const entry of ranked) {
     probMap.set(entry.team.id, entry.impliedProbability);
-  }
-
-  if (ranked.length === 0 && storedProbabilities) {
-    for (const [teamId, impliedProbability] of Object.entries(
-      storedProbabilities
-    )) {
-      if (impliedProbability > 0) {
-        probMap.set(teamId, impliedProbability);
-      }
-    }
   }
 
   return teams
@@ -136,13 +204,57 @@ function buildAllTeamChampionOdds(
     });
 }
 
+function sourceLabel(source: ChampionOddsSource): string {
+  switch (source) {
+    case "odds_api":
+      return "sportsbook win %";
+    case "polymarket":
+      return "Polymarket win %";
+    case "stored":
+      return "saved market win %";
+    default:
+      return "Winner odds from the market";
+  }
+}
+
+async function resolveChampionEntries(
+  teams: Team[],
+  storedProbabilities?: Record<string, number>
+): Promise<{ ranked: ChampionOddsEntry[]; source: ChampionOddsSource }> {
+  const fromOddsApi = await fetchOddsApiWinnerEntries(teams);
+  if (fromOddsApi.length > 0) {
+    await persistChampionProbabilities(fromOddsApi);
+    return { ranked: fromOddsApi, source: "odds_api" };
+  }
+
+  const fromPolymarket = await fetchPolymarketWinnerEntries(teams);
+  if (fromPolymarket.length > 0) {
+    await persistChampionProbabilities(fromPolymarket);
+    return { ranked: fromPolymarket, source: "polymarket" };
+  }
+
+  const fromStored = entriesFromStoredProbabilities(teams, storedProbabilities);
+  if (fromStored.length > 0) {
+    return { ranked: fromStored, source: "stored" };
+  }
+
+  return { ranked: [], source: "none" };
+}
+
 export async function getAllChampionOdds(
   teams: Team[],
   storedProbabilities?: Record<string, number>
-): Promise<ChampionOddsRow[]> {
-  const events = await getCachedWinnerEvents();
-  const ranked = processWorldCupWinnerOdds(events, teams);
-  return buildAllTeamChampionOdds(teams, ranked, storedProbabilities);
+): Promise<ChampionOddsResult> {
+  const { ranked, source } = await resolveChampionEntries(
+    teams,
+    storedProbabilities
+  );
+
+  return {
+    rows: buildAllTeamChampionOdds(teams, ranked),
+    source,
+    sourceLabel: sourceLabel(source),
+  };
 }
 
 export async function getTopChampionOdds(
@@ -150,12 +262,15 @@ export async function getTopChampionOdds(
   limit = 5,
   storedProbabilities?: Record<string, number>
 ): Promise<ChampionOddsEntry[]> {
-  const events = await getCachedWinnerEvents();
-  const ranked = processWorldCupWinnerOdds(events, teams);
+  const { ranked } = await resolveChampionEntries(teams, storedProbabilities);
+  return ranked.slice(0, limit);
+}
 
-  if (ranked.length > 0) {
-    return ranked.slice(0, limit);
-  }
-
-  return topFromStoredProbabilities(teams, storedProbabilities, limit);
+/** Manual refresh — uses Polymarket when Odds API quota is exhausted. */
+export async function syncChampionOdds(teams: Team[]): Promise<{
+  source: ChampionOddsSource;
+  teamCount: number;
+}> {
+  const { ranked, source } = await resolveChampionEntries(teams);
+  return { source, teamCount: ranked.length };
 }

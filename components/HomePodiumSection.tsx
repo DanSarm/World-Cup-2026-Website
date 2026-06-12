@@ -30,7 +30,10 @@ export async function HomePodiumSection({
       locked={locked}
       worldCupKickoff={worldCupKickoff}
       companionOutside={
-        <ChampionOddsPanel entries={championOdds} />
+        <ChampionOddsPanel
+          entries={championOdds.rows}
+          sourceLabel={championOdds.sourceLabel}
+        />
       }
     />
   );

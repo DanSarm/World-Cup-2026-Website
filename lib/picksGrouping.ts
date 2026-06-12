@@ -6,6 +6,7 @@ import {
   formatDateHeader,
   canPickMatch,
   isMatchLocked,
+  isMatchPlayed,
 } from "./utils";
 
 export interface PicksSection {
@@ -90,7 +91,7 @@ export function groupMatchesForPicks(matches: Match[]): PicksSection[] {
   return sections;
 }
 
-export type PicksFilter = "all" | "need" | "saved" | "open";
+export type PicksFilter = "all" | "need" | "picked" | "past";
 
 export function filterSections(
   sections: PicksSection[],
@@ -107,8 +108,8 @@ export function filterSections(
         const pickable = canPickMatch(m);
 
         if (filter === "need") return pickable && !hasPick;
-        if (filter === "saved") return hasPick;
-        if (filter === "open") return pickable;
+        if (filter === "picked") return hasPick;
+        if (filter === "past") return isMatchPlayed(m);
         return true;
       }),
     }))
