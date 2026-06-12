@@ -43,8 +43,8 @@ assert(
   "legacy pick scores on leaderboard"
 );
 assert(
-  getEffectiveMatchPrediction(match, pred({ pick_confirmed: false }))?.pred_home_score === 0,
-  "locked match without saved pick defaults to 0-0"
+  getEffectiveMatchPrediction(match, pred({ pick_confirmed: false }))?.pred_home_score === 2,
+  "existing row keeps stored scores even when unconfirmed"
 );
 assert(
   getEffectiveMatchPrediction(match, undefined)?.pred_away_score === 0,

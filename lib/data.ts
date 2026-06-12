@@ -11,7 +11,7 @@ import {
   scoringConfigFromSettings,
 } from "./scoring";
 import { buildProjectedPrizes } from "./payouts";
-import { isConfirmedPick } from "./pickUtils";
+import { getEffectiveMatchPrediction, isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchInPlayWindow } from "./matchLive";
@@ -589,10 +589,11 @@ export async function recalculateAllScores(): Promise<void> {
   const scoringConfig = scoringConfigFromSettings(settings);
 
   for (const pred of refreshedPredictions) {
-    if (!isConfirmedPick(pred)) continue;
     const match = matches.find((m) => m.id === pred.match_id);
     if (!match || !isMatchDecidedForScoring(match)) continue;
-    const result = scoreMatchPrediction(match, pred, scoringConfig);
+    const effective = getEffectiveMatchPrediction(match, pred);
+    if (!effective) continue;
+    const result = scoreMatchPrediction(match, effective, scoringConfig);
     await supabase
       .from("match_predictions")
       .update({

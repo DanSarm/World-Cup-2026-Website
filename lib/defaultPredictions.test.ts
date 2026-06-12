@@ -97,7 +97,17 @@ assert(
 );
 assert(
   !rows.some((row) => row.player_id === "p1" && row.match_id === "m1"),
-  "skips players with confirmed picks"
+  "skips players who already have a prediction row"
+);
+
+const rowsWithUnconfirmed = listMissingDefaultPickRows(
+  [match("m1")],
+  [player("p1")],
+  [pred("p1", "m1", { pick_confirmed: false })]
+);
+assert(
+  rowsWithUnconfirmed.length === 0,
+  "does not replace an existing unconfirmed pick row"
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

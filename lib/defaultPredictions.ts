@@ -1,5 +1,4 @@
 import { getSupabase } from "./supabaseServer";
-import { isConfirmedPick } from "./pickUtils";
 import { isMatchLocked } from "./utils";
 import type { Match, MatchPrediction, Player } from "./types";
 
@@ -13,7 +12,7 @@ export type DefaultPickRow = {
   updated_at: string;
 };
 
-/** Locked matches with both teams where the player has no saved pick yet. */
+/** Locked matches where the player has no prediction row at all. */
 export function listMissingDefaultPickRows(
   matches: Match[],
   players: Player[],
@@ -24,11 +23,9 @@ export function listMissingDefaultPickRows(
   );
   if (lockedMatches.length === 0 || players.length === 0) return [];
 
-  const confirmedKeys = new Set<string>();
+  const existingKeys = new Set<string>();
   for (const prediction of predictions) {
-    if (isConfirmedPick(prediction)) {
-      confirmedKeys.add(`${prediction.player_id}:${prediction.match_id}`);
-    }
+    existingKeys.add(`${prediction.player_id}:${prediction.match_id}`);
   }
 
   const now = new Date().toISOString();
@@ -37,7 +34,7 @@ export function listMissingDefaultPickRows(
   for (const match of lockedMatches) {
     for (const player of players) {
       const key = `${player.id}:${match.id}`;
-      if (confirmedKeys.has(key)) continue;
+      if (existingKeys.has(key)) continue;
 
       rows.push({
         player_id: player.id,
@@ -54,7 +51,7 @@ export function listMissingDefaultPickRows(
   return rows;
 }
 
-async function upsertDefaultPickRows(rows: DefaultPickRow[]): Promise<void> {
+async function insertDefaultPickRows(rows: DefaultPickRow[]): Promise<void> {
   if (rows.length === 0) return;
 
   const supabase = getSupabase();
@@ -62,31 +59,28 @@ async function upsertDefaultPickRows(rows: DefaultPickRow[]): Promise<void> {
 
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    let { error } = await supabase
-      .from("match_predictions")
-      .upsert(chunk, { onConflict: "player_id,match_id" });
+    let { error } = await supabase.from("match_predictions").insert(chunk);
 
     if (error?.message.includes("pick_confirmed")) {
       const legacyChunk = chunk.map(({ pick_confirmed: _confirmed, ...row }) => row);
-      ({ error } = await supabase
-        .from("match_predictions")
-        .upsert(legacyChunk, { onConflict: "player_id,match_id" }));
+      ({ error } = await supabase.from("match_predictions").insert(legacyChunk));
     }
 
-    if (error) {
+    // Unique violation means another request inserted first — safe to ignore.
+    if (error && !error.message.includes("duplicate key")) {
       console.error("ensureDefaultPredictionsForLockedMatches:", error.message);
     }
   }
 }
 
-/** Inserts or upgrades missing picks to confirmed 0-0 once a match has started. */
+/** Inserts confirmed 0-0 picks only when no row exists for that player/match. */
 export async function ensureDefaultPredictionsForLockedMatches(
   matches: Match[],
   players: Player[],
   predictions: MatchPrediction[]
 ): Promise<void> {
   const rows = listMissingDefaultPickRows(matches, players, predictions);
-  await upsertDefaultPickRows(rows);
+  await insertDefaultPickRows(rows);
 }
 
 export async function ensureDefaultPredictionsForPlayer(

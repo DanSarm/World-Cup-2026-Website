@@ -610,9 +610,7 @@ export function calculateLeaderboard(
   const potentialByPlayer = new Map<string, number>();
 
   const entries: LeaderboardEntry[] = players.map((player) => {
-    const playerPreds = confirmedPredictions.filter(
-      (p) => p.player_id === player.id
-    );
+    const playerPreds = predictions.filter((p) => p.player_id === player.id);
     const predByMatchId = new Map(playerPreds.map((p) => [p.match_id, p]));
     let matchPoints = 0;
     let groupStagePoints = 0;

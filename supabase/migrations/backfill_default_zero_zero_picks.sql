@@ -1,6 +1,5 @@
--- Backfill confirmed 0-0 picks for every player on every started match
--- where they did not submit a pick before kickoff.
--- Safe to re-run: existing confirmed picks are never overwritten.
+-- Backfill confirmed 0-0 picks only where no prediction row exists yet.
+-- Never overwrites an existing row. Safe to re-run.
 
 INSERT INTO match_predictions (
   player_id,
@@ -32,12 +31,5 @@ WHERE m.home_team_id IS NOT NULL
     FROM match_predictions mp
     WHERE mp.player_id = p.id
       AND mp.match_id = m.id
-      AND mp.pick_confirmed IS NOT FALSE
   )
-ON CONFLICT (player_id, match_id) DO UPDATE SET
-  pred_home_score = 0,
-  pred_away_score = 0,
-  pred_winner_team_id = NULL,
-  pick_confirmed = true,
-  updated_at = NOW()
-WHERE match_predictions.pick_confirmed IS FALSE;
+ON CONFLICT (player_id, match_id) DO NOTHING;

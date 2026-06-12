@@ -7,7 +7,7 @@ const DEFAULT_MISSING_PICK = {
   pred_winner_team_id: null,
 } as const;
 
-/** Counts saved picks; only explicit `pick_confirmed: false` is excluded (legacy placeholders). */
+/** Counts saved picks; only explicit `pick_confirmed: false` is excluded (auto placeholders). */
 export function isConfirmedPick(prediction: MatchPrediction): boolean {
   return prediction.pick_confirmed !== false;
 }
@@ -24,12 +24,12 @@ export type EffectivePickScores = Pick<
   "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
 >;
 
-/** Saved pick, or 0-0 once the match has started and no pick was submitted. */
+/** Use any stored pick row; default to 0-0 only when locked and no row exists. */
 export function getEffectiveMatchPrediction(
   match: Pick<Match, "status" | "kickoff_at">,
   prediction?: MatchPrediction | null
 ): EffectivePickScores | null {
-  if (prediction && isConfirmedPick(prediction)) {
+  if (prediction) {
     return {
       pred_home_score: prediction.pred_home_score,
       pred_away_score: prediction.pred_away_score,
@@ -48,7 +48,7 @@ export function usesDefaultMissingPick(
   match: Pick<Match, "status" | "kickoff_at">,
   prediction?: MatchPrediction | null
 ): boolean {
-  return isMatchLocked(match) && (!prediction || !isConfirmedPick(prediction));
+  return isMatchLocked(match) && !prediction;
 }
 
 export function isPodiumIncomplete(
