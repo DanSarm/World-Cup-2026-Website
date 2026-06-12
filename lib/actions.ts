@@ -121,7 +121,11 @@ export async function saveMatchPickAction(formData: FormData) {
     return { error: "Could not save pick" };
   }
 
-  await logAudit(session.id, "save_match_pick", { matchId });
+  await logAudit(session.id, "save_match_pick", {
+    matchId,
+    predHomeScore: parsed.data.predHomeScore,
+    predAwayScore: parsed.data.predAwayScore,
+  });
   revalidatePath("/picks");
   revalidatePath("/");
   return { success: true };
@@ -669,12 +673,22 @@ export async function adminOverridePickAction(formData: FormData) {
   const playerId = formData.get("playerId") as string;
   const matchId = formData.get("matchId") as string;
 
+  const predHomeScore = Number(formData.get("predHomeScore"));
+  const predAwayScore = Number(formData.get("predAwayScore"));
+
+  const { data: previous } = await supabase
+    .from("match_predictions")
+    .select("pred_home_score, pred_away_score")
+    .eq("player_id", playerId)
+    .eq("match_id", matchId)
+    .maybeSingle();
+
   await supabase.from("match_predictions").upsert(
     {
       player_id: playerId,
       match_id: matchId,
-      pred_home_score: Number(formData.get("predHomeScore")),
-      pred_away_score: Number(formData.get("predAwayScore")),
+      pred_home_score: predHomeScore,
+      pred_away_score: predAwayScore,
       pred_winner_team_id: (formData.get("predWinnerTeamId") as string) || null,
       pick_confirmed: true,
       updated_at: new Date().toISOString(),
@@ -683,7 +697,14 @@ export async function adminOverridePickAction(formData: FormData) {
   );
 
   await recalculateAllScores();
-  await logAudit(admin.id, "override_pick", { playerId, matchId });
+  await logAudit(admin.id, "override_pick", {
+    playerId,
+    matchId,
+    previousHome: previous?.pred_home_score ?? null,
+    previousAway: previous?.pred_away_score ?? null,
+    predHomeScore,
+    predAwayScore,
+  });
   revalidatePath("/admin");
   return { success: true };
 }
