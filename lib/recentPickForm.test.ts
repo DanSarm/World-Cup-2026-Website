@@ -111,10 +111,19 @@ const form = buildPlayerRecentForm(
   DEFAULT_SCORING_CONFIG
 );
 
-assert(form.length === 5, "returns five slots");
-assert(form[4] === "correct", "rightmost is latest match (draw, not exact)");
-assert(form[0] === "exact", "leftmost is oldest of last five");
-assert(form[2] === "exact", "middle slot includes exact score");
+assert(form.length === 10, "returns ten slots");
+assert(form[9] === "correct", "rightmost is latest match (draw, not exact)");
+assert(form[4] === "exact", "fifth slot is oldest of last six picks");
+assert(form[0] === null, "pads early slots when fewer than ten results");
+
+const formFive = buildPlayerRecentForm(
+  "player-1",
+  matches,
+  predictions,
+  DEFAULT_SCORING_CONFIG,
+  5
+);
+assert(formFive.length === 5, "count override still works");
 
 const liveMatch: Match = {
   ...matchBase,

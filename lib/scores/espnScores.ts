@@ -2,6 +2,7 @@ import { addDays, format, parseISO } from "date-fns";
 import type { Match } from "@/lib/types";
 import { teamNameMatches } from "@/lib/odds/teamAliases";
 import { isMatchInPlayWindow } from "@/lib/matchLive";
+import { formatEspnLiveClock } from "@/lib/liveClock";
 
 const ESPN_WC_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
@@ -14,6 +15,7 @@ export interface EspnScoreEvent {
   awayScore: number;
   completed: boolean;
   inProgress: boolean;
+  liveClockDisplay: string | null;
 }
 
 interface EspnCompetitor {
@@ -28,9 +30,13 @@ interface EspnScoreboardResponse {
     competitions?: Array<{
       competitors?: EspnCompetitor[];
       status?: {
+        displayClock?: string;
         type?: {
           state?: string;
           completed?: boolean;
+          name?: string;
+          description?: string;
+          shortDetail?: string;
         };
       };
     }>;
@@ -63,6 +69,7 @@ function parseEspnEvent(raw: NonNullable<EspnScoreboardResponse["events"]>[numbe
     awayScore,
     completed,
     inProgress: state === "in",
+    liveClockDisplay: formatEspnLiveClock(competition.status),
   };
 }
 

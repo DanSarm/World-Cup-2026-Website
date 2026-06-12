@@ -33,6 +33,7 @@ export async function GET() {
             away_score: liveMatch.away_score,
             winner_team_id: liveMatch.winner_team_id,
             live_updated_at: liveMatch.live_updated_at,
+            live_clock_display: liveMatch.live_clock_display,
             kickoff_at: liveMatch.kickoff_at,
             stage: liveMatch.stage,
             group_letter: liveMatch.group_letter,
@@ -63,6 +64,7 @@ export async function GET() {
           away_score: m.away_score,
           winner_team_id: m.winner_team_id,
           live_updated_at: m.live_updated_at,
+          live_clock_display: m.live_clock_display,
         })),
     });
   } catch (error) {

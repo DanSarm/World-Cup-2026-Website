@@ -24,6 +24,7 @@ import { MatchOddsBar } from "./MatchOddsBar";
 import { PickCountdownBadge } from "./PickCountdown";
 import { PickLockButton } from "./PickLockButton";
 import { LivePill } from "./LivePill";
+import { LiveMatchClock } from "./LiveMatchClock";
 
 interface MatchCardProps {
   match: Match;
@@ -243,7 +244,12 @@ export function MatchCard({
           )}
         </div>
         <div className="flex items-start gap-2 shrink-0">
-          {showingLiveScore && <LivePill />}
+          {showingLiveScore && (
+            <div className="flex flex-col items-end gap-1">
+              <LivePill />
+              <LiveMatchClock clock={match.live_clock_display} />
+            </div>
+          )}
           {showPickCountdown && !showingLiveScore && !isLive && (
             <PickCountdownBadge kickoffAt={match.kickoff_at} />
           )}
@@ -311,6 +317,12 @@ export function MatchCard({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-bold uppercase tracking-wide text-canada">
               Live score · {match.home_score}–{match.away_score}
+              {match.live_clock_display ? (
+                <span className="text-canada/90 normal-case font-extrabold">
+                  {" "}
+                  · {match.live_clock_display}
+                </span>
+              ) : null}
             </p>
             {match.live_updated_at && (
               <p className="text-[10px] text-ink-faint tabular-nums">

@@ -39,6 +39,7 @@ export interface SyncLiveScoresResult {
   syncedAt: string;
   quotaCost?: number;
   source?: "espn" | "odds_api" | "none";
+  liveClockByMatchId?: Record<string, string>;
 }
 
 function inferWinnerTeamId(
@@ -162,15 +163,19 @@ async function applyScoreUpdate(
     away_score: awayScore,
     status: "live",
   });
-  if (!inPlay && match.status !== "live") return "skipped";
+  if (!inPlay && match.status !== "live" && match.status !== "locked") {
+    return "skipped";
+  }
 
+  // Use "locked" for in-progress updates — works on DBs that predate the
+  // matches_status_check migration adding "live". UI treats locked+in-play as live.
   const { error } = await supabase
     .from("matches")
     .update({
       home_score: homeScore,
       away_score: awayScore,
       winner_team_id: winnerTeamId,
-      status: "live",
+      status: "locked",
       updated_at: syncedAt,
     })
     .eq("id", match.id);
@@ -191,6 +196,7 @@ async function syncFromEspn(
   liveMatchIds: string[];
   needsRecalc: boolean;
   unresolved: Match[];
+  liveClockByMatchId: Record<string, string>;
 }> {
   const dates = scoreboardDatesForMatches(matches);
   const events = await fetchEspnWorldCupEvents(dates);
@@ -200,6 +206,7 @@ async function syncFromEspn(
   const liveMatchIds: string[] = [];
   let needsRecalc = false;
   const unresolved: Match[] = [];
+  const liveClockByMatchId: Record<string, string> = {};
 
   for (const match of matches) {
     if (!matchNeedsExternalScore(match)) continue;
@@ -208,6 +215,10 @@ async function syncFromEspn(
     if (!event) {
       unresolved.push(match);
       continue;
+    }
+
+    if (event.liveClockDisplay) {
+      liveClockByMatchId[match.id] = event.liveClockDisplay;
     }
 
     const result = await applyScoreUpdate(
@@ -227,7 +238,7 @@ async function syncFromEspn(
     }
   }
 
-  return { updated, finalized, liveMatchIds, needsRecalc, unresolved };
+  return { updated, finalized, liveMatchIds, needsRecalc, unresolved, liveClockByMatchId };
 }
 
 async function syncFromOddsApi(
@@ -371,6 +382,7 @@ export async function syncLiveScores(
   let needsRecalc = false;
   let quotaCost = 0;
   let source: SyncLiveScoresResult["source"] = "espn";
+  let liveClockByMatchId: Record<string, string> = {};
 
   try {
     const espnResult = await syncFromEspn(matches, syncedAt);
@@ -378,6 +390,7 @@ export async function syncLiveScores(
     finalized += espnResult.finalized;
     liveMatchIds.push(...espnResult.liveMatchIds);
     needsRecalc ||= espnResult.needsRecalc;
+    liveClockByMatchId = espnResult.liveClockByMatchId;
     await setLastSyncTime(ESPN_LAST_SYNC_KEY, Date.now());
 
     const oddsFallback = espnResult.unresolved.filter(
@@ -438,5 +451,6 @@ export async function syncLiveScores(
     syncedAt,
     quotaCost,
     source,
+    liveClockByMatchId,
   };
 }

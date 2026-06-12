@@ -15,6 +15,7 @@ import { isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchInPlayWindow } from "./matchLive";
+import { mergeLiveClocks } from "./liveClock";
 import { matchDateKey } from "./utils";
 import { resolveMatchesForPicks } from "./resolvedMatches";
 import type {
@@ -514,17 +515,22 @@ export async function getLiveSnapshot() {
   const { syncLiveScores } = await import("./scores/sync");
   const sync = await syncLiveScores();
   const snapshot = await getLeaderboardData({ includeLiveScores: true });
-  return { sync, ...snapshot };
+  const matches = mergeLiveClocks(snapshot.matches, sync.liveClockByMatchId);
+  const liveMatch = findLiveMatch(matches);
+  return { sync, ...snapshot, matches, liveMatch };
 }
 
 export async function getPicksSnapshot(playerId: string) {
   let matches = await getMatchesWithTeams();
+  let liveClockByMatchId: Record<string, string> | undefined;
   if (isAnyMatchInPlayWindow(matches)) {
     const { syncLiveScores } = await import("./scores/sync");
-    await syncLiveScores();
+    const sync = await syncLiveScores();
+    liveClockByMatchId = sync.liveClockByMatchId;
     matches = await getMatchesWithTeams();
   }
 
+  matches = mergeLiveClocks(matches, liveClockByMatchId);
   const pickMatches = resolveMatchesForPicks(matches);
   const matchIds = pickMatches.map((m) => m.id);
 
@@ -534,10 +540,20 @@ export async function getPicksSnapshot(playerId: string) {
     getConfirmedMatchPicksByMatchIds(matchIds),
   ]);
 
+  const { ensureDefaultPredictionsForLockedMatches } = await import(
+    "./defaultPredictions"
+  );
+  await ensureDefaultPredictionsForLockedMatches(
+    pickMatches,
+    players,
+    predictions
+  );
+  const refreshedPredictions = await getPredictions(playerId);
+
   return {
     syncedAt: new Date().toISOString(),
     matches: pickMatches,
-    predictions,
+    predictions: refreshedPredictions,
     communityPicksByMatchId: Object.fromEntries(communityPicksByMatchId),
     totalPlayers: players.length,
     hasLiveScoring: hasAnyDisplayableLiveScore(matches),

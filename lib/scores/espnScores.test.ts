@@ -79,6 +79,7 @@ const events: EspnScoreEvent[] = [
     awayScore: 1,
     completed: true,
     inProgress: false,
+    liveClockDisplay: null,
   },
 ];
 

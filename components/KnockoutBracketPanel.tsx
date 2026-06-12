@@ -11,6 +11,7 @@ import {
   type PickScore,
 } from "@/lib/groupStandings";
 import type { Match, MatchPrediction } from "@/lib/types";
+import { isMatchCurrentlyPlaying } from "@/lib/matchLive";
 import { hasSavedPick } from "@/lib/pickUtils";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
@@ -238,7 +239,7 @@ function BracketMatchCard({
   featured?: boolean;
   dbMatch?: Match;
 }) {
-  const isLive = dbMatch?.status === "live";
+  const isLive = dbMatch != null && isMatchCurrentlyPlaying(dbMatch);
   const showActual = match.isActualResult;
 
   return (

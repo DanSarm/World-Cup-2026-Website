@@ -11,6 +11,21 @@ import type {
 
 export type { PickFormResult, PickFormSlot };
 
+export const RECENT_FORM_MOBILE_COUNT = 5;
+export const RECENT_FORM_DESKTOP_COUNT = 10;
+
+export function padPickFormSlots(
+  form: PickFormSlot[],
+  count: number
+): PickFormSlot[] {
+  if (form.length === count) return form;
+  if (form.length > count) return form.slice(-count);
+  return [
+    ...Array(count - form.length).fill(null),
+    ...form,
+  ] as PickFormSlot[];
+}
+
 type PickScores =
   | Pick<MatchPrediction, "pred_home_score" | "pred_away_score">
   | { predHomeScore: number; predAwayScore: number };
@@ -136,11 +151,8 @@ export function withLiveFormSlot(
   const live = classifyLivePickResult(match, prediction, scoringConfig);
   if (!live) return form;
 
-  const slots: PickFormSlot[] =
-    form.length === 5
-      ? [...form]
-      : ([...Array(5 - form.length).fill(null), ...form] as PickFormSlot[]);
-  slots[4] = live;
+  const slots = padPickFormSlots(form, RECENT_FORM_DESKTOP_COUNT);
+  slots[RECENT_FORM_DESKTOP_COUNT - 1] = live;
   return slots;
 }
 
@@ -149,7 +161,7 @@ export function buildPlayerRecentForm(
   matches: Match[],
   predictions: MatchPrediction[],
   scoringConfig: ScoringConfig,
-  count = 5
+  count = RECENT_FORM_DESKTOP_COUNT
 ): PickFormSlot[] {
   const predByMatchId = new Map(
     predictions
@@ -176,7 +188,7 @@ export function buildPlayerRecentForm(
   }
 
   const recent = results.slice(-count);
-  return [...Array(Math.max(0, count - recent.length)).fill(null), ...recent];
+  return padPickFormSlots(recent, count);
 }
 
 export function buildRecentFormByPlayer(

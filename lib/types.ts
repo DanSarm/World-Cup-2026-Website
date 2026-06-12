@@ -96,6 +96,8 @@ export interface Match {
   away_score: number | null;
   winner_team_id: string | null;
   live_updated_at?: string | null;
+  /** Ephemeral — from ESPN on last live sync, not stored in DB. */
+  live_clock_display?: string | null;
   decided_by_penalties: boolean;
   home_win_bonus: number;
   draw_bonus: number;

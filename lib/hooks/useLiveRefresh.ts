@@ -20,6 +20,7 @@ export interface LiveApiPayload {
     | "away_score"
     | "winner_team_id"
     | "live_updated_at"
+    | "live_clock_display"
     | "kickoff_at"
     | "stage"
     | "group_letter"
@@ -35,6 +36,7 @@ export interface LiveApiPayload {
     | "away_score"
     | "winner_team_id"
     | "live_updated_at"
+    | "live_clock_display"
   >[];
 }
 
@@ -90,6 +92,7 @@ export function mergeLiveMatch(
     | "away_score"
     | "winner_team_id"
     | "live_updated_at"
+    | "live_clock_display"
   > | null
 ): Match {
   if (!live || live.id !== base.id) return base;
@@ -100,6 +103,7 @@ export function mergeLiveMatch(
     away_score: live.away_score,
     winner_team_id: live.winner_team_id,
     live_updated_at: live.live_updated_at,
+    live_clock_display: live.live_clock_display ?? base.live_clock_display,
   };
 }
 

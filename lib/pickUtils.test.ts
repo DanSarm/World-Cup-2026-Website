@@ -43,8 +43,21 @@ assert(
   "legacy pick scores on leaderboard"
 );
 assert(
-  getEffectiveMatchPrediction(match, pred({ pick_confirmed: false })) == null,
-  "auto placeholder not scored"
+  getEffectiveMatchPrediction(match, pred({ pick_confirmed: false }))?.pred_home_score === 0,
+  "locked match without saved pick defaults to 0-0"
+);
+assert(
+  getEffectiveMatchPrediction(match, undefined)?.pred_away_score === 0,
+  "missing row on locked match defaults to 0-0"
+);
+
+const openMatch: Pick<Match, "status" | "kickoff_at"> = {
+  status: "scheduled",
+  kickoff_at: "2099-06-13T00:00:00Z",
+};
+assert(
+  getEffectiveMatchPrediction(openMatch, undefined) == null,
+  "open match without pick stays unscored"
 );
 
 console.log(`\n${passed} passed, ${failed} failed`);

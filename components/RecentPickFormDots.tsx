@@ -1,4 +1,9 @@
 import type { PickFormSlot } from "@/lib/types";
+import {
+  padPickFormSlots,
+  RECENT_FORM_DESKTOP_COUNT,
+  RECENT_FORM_MOBILE_COUNT,
+} from "@/lib/recentPickForm";
 
 interface RecentPickFormDotsProps {
   form: PickFormSlot[];
@@ -17,16 +22,18 @@ const SLOT_LABELS: Record<NonNullable<PickFormSlot>, string> = {
 
 function slotShellClass(result: PickFormSlot): string {
   if (result === "exact" || result === "live-exact") {
-    return "bg-gold/30 ring-1 ring-gold/50";
+    return "bg-gold-light ring-2 ring-gold-dark shadow-[0_1px_6px_rgb(212_175_55/0.55)]";
   }
   if (result === "correct" || result === "live-correct") {
-    return "bg-mexico/20 ring-1 ring-mexico/40";
+    return "bg-mexico-light ring-2 ring-mexico shadow-[0_1px_6px_rgb(0_104_71/0.5)]";
   }
   if (result === "wrong" || result === "live-wrong") {
-    return "bg-canada/20 ring-1 ring-canada/35";
+    return "bg-canada ring-2 ring-canada-light shadow-[0_1px_6px_rgb(200_16_46/0.55)]";
   }
-  if (result === "live-pending") return "bg-ink/12 ring-1 ring-ink/10";
-  return "bg-ink/10";
+  if (result === "live-pending") {
+    return "bg-ink/25 ring-2 ring-ink/30";
+  }
+  return "bg-ink/15 ring-1 ring-ink/25";
 }
 
 function SlotIcon({ result }: { result: PickFormSlot }) {
@@ -44,7 +51,7 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
     return (
       <svg
         viewBox="0 0 12 12"
-        className="w-2.5 h-2.5 text-mexico"
+        className="w-2.5 h-2.5 text-white"
         aria-hidden
       >
         <path
@@ -62,9 +69,8 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
         className="w-2.5 h-2.5"
         aria-hidden
       >
-        <circle cx="6" cy="6" r="5.25" fill="#fff" stroke="var(--color-canada)" strokeWidth="1.25" />
         <path
-          fill="var(--color-canada)"
+          fill="#fff"
           d="M4.1 4.1a.55.55 0 0 1 .78 0L6 5.22l1.12-1.12a.55.55 0 1 1 .78.78L6.78 6l1.12 1.12a.55.55 0 1 1-.78.78L6 6.78 4.88 7.9a.55.55 0 1 1-.78-.78L5.22 6 4.1 4.88a.55.55 0 0 1 0-.78Z"
         />
       </svg>
@@ -73,7 +79,7 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
 
   return (
     <span
-      className="w-1.5 h-1.5 rounded-full bg-ink/35 animate-pulse"
+      className="w-1.5 h-1.5 rounded-full bg-white/70 animate-pulse"
       aria-hidden
     />
   );
@@ -83,20 +89,21 @@ export function RecentPickFormDots({
   form,
   className = "",
 }: RecentPickFormDotsProps) {
-  const slots: PickFormSlot[] =
-    form.length === 5
-      ? form
-      : ([...Array(5 - form.length).fill(null), ...form] as PickFormSlot[]);
+  const slots = padPickFormSlots(form, RECENT_FORM_DESKTOP_COUNT);
+  const mobileHiddenCount =
+    RECENT_FORM_DESKTOP_COUNT - RECENT_FORM_MOBILE_COUNT;
 
   return (
     <span
       className={`inline-flex items-center gap-1 shrink-0 ${className}`}
-      title="Last 5 results (right = most recent)"
+      title="Recent results (right = most recent)"
     >
       {slots.map((result, index) => (
         <span
           key={index}
-          className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${slotShellClass(result)}`}
+          className={`w-4 h-4 rounded-full items-center justify-center shrink-0 ${slotShellClass(result)} ${
+            index < mobileHiddenCount ? "hidden sm:flex" : "flex"
+          }`}
           title={result != null ? SLOT_LABELS[result] : "No result yet"}
         >
           <SlotIcon result={result} />

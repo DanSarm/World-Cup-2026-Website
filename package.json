@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts && tsx lib/scores/espnScores.test.ts",
     "seed": "tsx scripts/seed.ts",
-    "migrate:pick-confirmed": "tsx scripts/migrate-pick-confirmed.ts"
+    "migrate:pick-confirmed": "tsx scripts/migrate-pick-confirmed.ts",
+    "backfill:default-picks": "tsx scripts/backfill-default-picks.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

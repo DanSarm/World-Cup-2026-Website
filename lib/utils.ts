@@ -1,6 +1,7 @@
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { isBefore, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { Match } from "./types";
+import { isMatchCurrentlyPlaying } from "./matchLive";
 
 const TZ = "America/New_York";
 
@@ -39,7 +40,7 @@ export function getLockStatus(match: Match): {
   if (match.status === "final") {
     return { label: "Final", variant: "final" };
   }
-  if (match.status === "live") {
+  if (match.status === "live" || isMatchCurrentlyPlaying(match)) {
     return { label: "Live", variant: "live" };
   }
   if (isMatchLocked(match)) {

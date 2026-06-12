@@ -6,6 +6,7 @@ import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
 import { formatMoney } from "@/lib/payouts";
 import { RankMedal } from "./PlaceMedal";
+import { LivePill } from "./LivePill";
 
 import { type LeaderboardFilter } from "@/lib/leaderboardFilter";
 
@@ -111,12 +112,6 @@ export function LeaderboardTable({
             {entry.exactScores > 0 && (
               <span> · {entry.exactScores} exact</span>
             )}
-            {entry.perfectDaysCount > 0 && (
-              <span className="text-mexico font-semibold">
-                {" "}
-                · Perfect Day{entry.perfectDaysCount > 1 ? ` ×${entry.perfectDaysCount}` : ""} 🎉
-              </span>
-            )}
           </p>
         </div>
 
@@ -151,15 +146,7 @@ export function LeaderboardTable({
   return (
     <div className="card p-0 overflow-hidden">
       <div className="p-2.5 sm:p-3 border-b border-ink/5 space-y-2">
-        {hasLiveScoring && (
-          <p className="text-xs font-semibold text-canada leading-snug">
-            <span className="sm:hidden">Live — totals include provisional points</span>
-            <span className="hidden sm:inline">
-              Live match in progress — totals include provisional points from the
-              current score
-            </span>
-          </p>
-        )}
+        {hasLiveScoring && <LivePill />}
         <div className="relative z-10 space-y-2">
           <div className="segmented-light" role="tablist" aria-label="Leaderboard view">
             <button
