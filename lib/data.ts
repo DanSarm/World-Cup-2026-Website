@@ -402,7 +402,7 @@ export async function getLeaderboardData(options?: {
   if (await finalizeCompletedMatches(matches)) {
     matches = await getMatchesWithTeams();
   }
-  const [players, predictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
+  const [players, scoredPredictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
     await Promise.all([
       getPlayers(),
       getPredictions(),
@@ -413,16 +413,6 @@ export async function getLeaderboardData(options?: {
       getSettings(),
       getTeams(),
     ]);
-
-  const { ensureDefaultPredictionsForLockedMatches } = await import(
-    "./defaultPredictions"
-  );
-  await ensureDefaultPredictionsForLockedMatches(
-    matches,
-    players,
-    predictions
-  );
-  const scoredPredictions = await getPredictions();
 
   const podiumByPlayer = new Map(
     podiumPredictions.map((p) => [p.player_id, p])
@@ -540,20 +530,10 @@ export async function getPicksSnapshot(playerId: string) {
     getConfirmedMatchPicksByMatchIds(matchIds),
   ]);
 
-  const { ensureDefaultPredictionsForLockedMatches } = await import(
-    "./defaultPredictions"
-  );
-  await ensureDefaultPredictionsForLockedMatches(
-    pickMatches,
-    players,
-    predictions
-  );
-  const refreshedPredictions = await getPredictions(playerId);
-
   return {
     syncedAt: new Date().toISOString(),
     matches: pickMatches,
-    predictions: refreshedPredictions,
+    predictions,
     communityPicksByMatchId: Object.fromEntries(communityPicksByMatchId),
     totalPlayers: players.length,
     hasLiveScoring: hasAnyDisplayableLiveScore(matches),
@@ -562,7 +542,7 @@ export async function getPicksSnapshot(playerId: string) {
 
 export async function recalculateAllScores(): Promise<void> {
   const supabase = getSupabase();
-  const [matches, predictions, podiumPredictions, finalsPredictions, actualResults, settings, players, teams] =
+  const [matches, , podiumPredictions, finalsPredictions, actualResults, settings, players, teams] =
     await Promise.all([
       getMatchesWithTeams(),
       getPredictions(),
@@ -573,15 +553,6 @@ export async function recalculateAllScores(): Promise<void> {
       getPlayers(),
       getTeams(),
     ]);
-
-  const { ensureDefaultPredictionsForLockedMatches } = await import(
-    "./defaultPredictions"
-  );
-  await ensureDefaultPredictionsForLockedMatches(
-    matches,
-    players,
-    predictions
-  );
 
   const refreshedPredictions = await getPredictions();
 
