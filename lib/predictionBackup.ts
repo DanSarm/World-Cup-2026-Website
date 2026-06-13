@@ -23,6 +23,28 @@ export type PredictionBackupPayload = {
   rows: PredictionBackupRow[];
 };
 
+type JoinedPlayer = { display_name: string };
+type JoinedMatch = { match_number: number };
+
+type PredictionBackupQueryRow = {
+  player_id: string;
+  match_id: string;
+  pred_home_score: number;
+  pred_away_score: number;
+  pred_winner_team_id: string | null;
+  pick_confirmed: boolean;
+  points: number | null;
+  submitted_at: string | null;
+  updated_at: string | null;
+  players: JoinedPlayer | JoinedPlayer[] | null;
+  matches: JoinedMatch | JoinedMatch[] | null;
+};
+
+function firstJoined<T>(value: T | T[] | null | undefined): T | null {
+  if (value == null) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
 export async function fetchPredictionBackupRows(): Promise<PredictionBackupRow[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("match_predictions").select(
@@ -43,21 +65,24 @@ export async function fetchPredictionBackupRows(): Promise<PredictionBackupRow[]
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).map((row) => ({
-    player_id: row.player_id,
-    player_name:
-      (row.players as { display_name: string } | null)?.display_name ?? "?",
-    match_id: row.match_id,
-    match_number:
-      (row.matches as { match_number: number } | null)?.match_number ?? 0,
-    pred_home_score: row.pred_home_score,
-    pred_away_score: row.pred_away_score,
-    pred_winner_team_id: row.pred_winner_team_id,
-    pick_confirmed: row.pick_confirmed,
-    points: row.points,
-    submitted_at: row.submitted_at,
-    updated_at: row.updated_at,
-  }));
+  return ((data ?? []) as PredictionBackupQueryRow[]).map((row) => {
+    const player = firstJoined(row.players);
+    const match = firstJoined(row.matches);
+
+    return {
+      player_id: row.player_id,
+      player_name: player?.display_name ?? "?",
+      match_id: row.match_id,
+      match_number: match?.match_number ?? 0,
+      pred_home_score: row.pred_home_score,
+      pred_away_score: row.pred_away_score,
+      pred_winner_team_id: row.pred_winner_team_id,
+      pick_confirmed: row.pick_confirmed,
+      points: row.points,
+      submitted_at: row.submitted_at,
+      updated_at: row.updated_at,
+    };
+  });
 }
 
 export async function savePredictionSnapshot(

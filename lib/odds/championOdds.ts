@@ -158,7 +158,7 @@ async function fetchOddsApiWinnerEntries(
     const events = await fetchWorldCupWinnerOdds();
     return processWorldCupWinnerOdds(events, teams);
   } catch (error) {
-    console.error("fetchWorldCupWinnerOdds:", error);
+    console.warn("fetchWorldCupWinnerOdds:", error);
     return [];
   }
 }
@@ -221,10 +221,15 @@ async function resolveChampionEntries(
   teams: Team[],
   storedProbabilities?: Record<string, number>
 ): Promise<{ ranked: ChampionOddsEntry[]; source: ChampionOddsSource }> {
-  const fromOddsApi = await fetchOddsApiWinnerEntries(teams);
-  if (fromOddsApi.length > 0) {
-    await persistChampionProbabilities(fromOddsApi);
-    return { ranked: fromOddsApi, source: "odds_api" };
+  const remaining = await getStoredCreditsRemaining();
+  const skipOddsApi = remaining != null && remaining <= 0;
+
+  if (!skipOddsApi) {
+    const fromOddsApi = await fetchOddsApiWinnerEntries(teams);
+    if (fromOddsApi.length > 0) {
+      await persistChampionProbabilities(fromOddsApi);
+      return { ranked: fromOddsApi, source: "odds_api" };
+    }
   }
 
   const fromPolymarket = await fetchPolymarketWinnerEntries(teams);

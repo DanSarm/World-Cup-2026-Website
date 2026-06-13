@@ -7,6 +7,7 @@
 import type { Match, Team } from "@/lib/types";
 import { isKnockoutStage } from "@/lib/types";
 import { getOddsConfig, isOddsApiConfigured } from "./config";
+import { recordOddsApiUsage } from "./quotaGuard";
 import {
   average,
   calculateNoVigProbabilities,
@@ -113,11 +114,25 @@ export async function fetchUpcomingOdds(): Promise<OddsApiEvent[]> {
   return (await res.json()) as OddsApiEvent[];
 }
 
-/** Outright World Cup winner odds (futures). */
+function parseCreditsRemaining(res: Response): number | null {
+  const header = res.headers.get("x-requests-remaining");
+  if (header == null) return null;
+  const value = Number(header);
+  return Number.isFinite(value) ? value : null;
+}
+
+function isOddsQuotaExceeded(status: number, body: string): boolean {
+  return (
+    status === 401 &&
+    (body.includes("OUT_OF_USAGE_CREDITS") || body.includes("Usage quota"))
+  );
+}
+
+/** Outright World Cup winner odds (futures). Returns [] when quota is exhausted. */
 export async function fetchWorldCupWinnerOdds(): Promise<OddsApiEvent[]> {
   const config = getOddsConfig();
   if (!config.apiKey) {
-    throw new Error("ODDS_API_KEY is not configured");
+    return [];
   }
 
   const params = new URLSearchParams({
@@ -132,7 +147,16 @@ export async function fetchWorldCupWinnerOdds(): Promise<OddsApiEvent[]> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (isOddsQuotaExceeded(res.status, body)) {
+      await recordOddsApiUsage(1, 0);
+      return [];
+    }
     throw new Error(`Odds API winner error ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const creditsRemaining = parseCreditsRemaining(res);
+  if (creditsRemaining != null) {
+    await recordOddsApiUsage(1, creditsRemaining);
   }
 
   return (await res.json()) as OddsApiEvent[];
