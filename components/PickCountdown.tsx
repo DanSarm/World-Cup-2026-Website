@@ -33,18 +33,31 @@ function formatCountdown(left: NonNullable<ReturnType<typeof getTimeLeft>>): str
 export function PickCountdownBadge({
   kickoffAt,
   label = "left",
+  finished = false,
 }: {
   kickoffAt: string | null;
   label?: string;
+  finished?: boolean;
 }) {
   const [left, setLeft] = useState<ReturnType<typeof getTimeLeft>>(null);
 
   useEffect(() => {
+    if (finished) return;
     const tick = () => setLeft(getTimeLeft(kickoffAt));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [kickoffAt]);
+  }, [kickoffAt, finished]);
+
+  if (finished) {
+    return (
+      <div className="shrink-0 text-right leading-tight">
+        <span className="text-base font-extrabold uppercase tracking-wide text-ink-faint tabular-nums">
+          Finished
+        </span>
+      </div>
+    );
+  }
 
   if (!kickoffAt) {
     return (

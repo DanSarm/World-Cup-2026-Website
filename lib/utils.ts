@@ -1,7 +1,7 @@
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 import { isBefore, parseISO, startOfWeek, endOfWeek, isWithinInterval } from "date-fns";
 import type { Match } from "./types";
-import { isMatchCurrentlyPlaying } from "./matchLive";
+import { isMatchCurrentlyPlaying, isMatchInPlayWindow } from "./matchLive";
 
 const TZ = "America/New_York";
 
@@ -86,6 +86,21 @@ export function isMatchToday(kickoffAt: string | null): boolean {
 
 export function canPickMatch(match: Match): boolean {
   return !!(match.home_team_id && match.away_team_id && !isMatchLocked(match));
+}
+
+/** Match is over and not still in play — show finished state, not a countdown. */
+export function isMatchFinished(
+  match: Pick<
+    Match,
+    "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
+  >
+): boolean {
+  if (isMatchCurrentlyPlaying(match) || isMatchInPlayWindow(match)) {
+    return false;
+  }
+  if (match.status === "final") return true;
+  if (!match.kickoff_at || !match.home_team_id) return false;
+  return !isBefore(new Date(), parseISO(match.kickoff_at));
 }
 
 /** Match has finished — kickoff occurred and a final score is in. */
