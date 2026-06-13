@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeDisplayName } from "./playerNames";
 
 export const pinSchema = z
   .string()
@@ -6,9 +7,14 @@ export const pinSchema = z
 
 export const displayNameSchema = z
   .string()
-  .min(2, "Name too short")
-  .max(30, "Name too long")
-  .regex(/^[a-zA-Z0-9\s\-'.]+$/, "Invalid characters");
+  .transform(normalizeDisplayName)
+  .pipe(
+    z
+      .string()
+      .min(2, "Name too short")
+      .max(30, "Name too long")
+      .regex(/^[a-zA-Z0-9\s\-'.]+$/, "Invalid characters")
+  );
 
 export const registerSchema = z.object({
   displayName: displayNameSchema,

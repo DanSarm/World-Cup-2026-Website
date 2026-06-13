@@ -2,6 +2,10 @@ import bcrypt from "bcryptjs";
 import { getSupabase } from "./supabaseServer";
 import { getTeamIdByCode } from "./teamsDb";
 import {
+  normalizeDisplayName,
+  normalizedDisplayNameKey,
+} from "./playerNames";
+import {
   createSession,
   setSessionCookie,
   getSession,
@@ -114,6 +118,30 @@ export async function getSettings(): Promise<Settings> {
   return settings;
 }
 
+async function findPlayerByDisplayName<
+  T extends Record<string, unknown>,
+>(select: string, displayName: string): Promise<T | null> {
+  const supabase = getSupabase();
+  const key = normalizedDisplayNameKey(displayName);
+  const { data, error } = await supabase.from("players").select(select);
+
+  if (error) {
+    console.error("player lookup error:", error);
+    return null;
+  }
+
+  const matches = (data ?? []).filter(
+    (row) =>
+      normalizedDisplayNameKey(String(row.display_name)) === key
+  );
+
+  if (matches.length > 1) {
+    console.error("duplicate display names for key:", key, matches);
+  }
+
+  return (matches[0] as T | undefined) ?? null;
+}
+
 export async function registerPlayer(input: {
   displayName: string;
   pin: string;
@@ -123,18 +151,13 @@ export async function registerPlayer(input: {
   const configError = getDatabaseConfigError();
   if (configError) return { success: false, error: configError };
 
+  const displayName = normalizeDisplayName(input.displayName);
   const supabase = getSupabase();
 
-  const { data: existing, error: lookupError } = await supabase
-    .from("players")
-    .select("id")
-    .eq("display_name", input.displayName)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("register lookup error:", lookupError);
-    return { success: false, error: supabaseErrorMessage(lookupError) };
-  }
+  const existing = await findPlayerByDisplayName<{ id: string }>(
+    "id, display_name",
+    displayName
+  );
 
   if (existing) {
     return { success: false, error: "Name already taken — use Enter to sign in" };
@@ -153,7 +176,7 @@ export async function registerPlayer(input: {
   const { data: player, error } = await supabase
     .from("players")
     .insert({
-      display_name: input.displayName,
+      display_name: displayName,
       pin_hash: pinHash,
       favorite_team_id: favoriteTeamId,
       is_admin: isAdmin,
@@ -163,6 +186,12 @@ export async function registerPlayer(input: {
 
   if (error || !player) {
     console.error("register insert error:", error);
+    if (error?.code === "23505") {
+      return {
+        success: false,
+        error: "Name already taken — use Enter to sign in",
+      };
+    }
     return {
       success: false,
       error:
@@ -197,18 +226,18 @@ export async function loginPlayer(input: {
   const configError = getDatabaseConfigError();
   if (configError) return { success: false, error: configError };
 
-  const supabase = getSupabase();
-
-  const { data: player, error: lookupError } = await supabase
-    .from("players")
-    .select("id, display_name, pin_hash, avatar_emoji, is_admin, paid")
-    .eq("display_name", input.displayName)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("login lookup error:", lookupError);
-    return { success: false, error: supabaseErrorMessage(lookupError) };
-  }
+  const displayName = normalizeDisplayName(input.displayName);
+  const player = await findPlayerByDisplayName<{
+    id: string;
+    display_name: string;
+    pin_hash: string;
+    avatar_emoji: string | null;
+    is_admin: boolean;
+    paid: boolean;
+  }>(
+    "id, display_name, pin_hash, avatar_emoji, is_admin, paid",
+    displayName
+  );
 
   if (!player) {
     return {
@@ -222,6 +251,7 @@ export async function loginPlayer(input: {
     return { success: false, error: "Wrong PIN for this name" };
   }
 
+  const supabase = getSupabase();
   let isAdmin = player.is_admin;
   if (
     input.adminInviteCode &&
