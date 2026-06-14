@@ -1,44 +1,57 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  ADMIN_NAV,
+  isNavActive,
+  PRIMARY_NAV,
+  type NavItem,
+} from "@/lib/navConfig";
+import { NavIcon } from "./nav/NavIcons";
+import { useFastNav } from "./nav/useFastNav";
 
 interface BottomNavProps {
   isAdmin?: boolean;
 }
 
-const links = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/picks", label: "Picks", icon: "⚽" },
-  { href: "/bracket", label: "Bracket", icon: "📋" },
-  { href: "/leaderboard", label: "Rank", icon: "📊" },
-];
-
 export function BottomNav({ isAdmin }: BottomNavProps) {
   const pathname = usePathname();
+  const { navigate, activePath, isNavigating } = useFastNav();
+
   if (pathname === "/login") return null;
 
-  const allLinks = isAdmin
-    ? [...links, { href: "/admin", label: "Admin", icon: "⚙️" }]
-    : links;
+  const items: NavItem[] = isAdmin
+    ? [...PRIMARY_NAV, ADMIN_NAV]
+    : PRIMARY_NAV;
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 safe-area-pb">
-      <div className="mx-3 mb-3 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-xl shadow-2xl shadow-black/40">
-        <div className="flex justify-around py-2 px-1">
-          {allLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`nav-link min-w-[56px] ${
-                pathname === link.href ? "nav-link-active" : ""
-              }`}
+    <nav
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bottom-nav safe-area-pb"
+      aria-label="Main navigation"
+    >
+      <div
+        className={`bottom-nav-bar ${isNavigating ? "bottom-nav-bar--busy" : ""}`}
+      >
+        {items.map((item) => {
+          const active = isNavActive(activePath, item.href);
+          const label = item.mobileLabel ?? item.label;
+
+          return (
+            <button
+              key={item.href}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              aria-label={item.label}
+              disabled={active}
+              onClick={() => navigate(item.href)}
+              className={`bottom-nav-item ${active ? "bottom-nav-item--active" : ""}`}
             >
-              <span className="text-xl leading-none">{link.icon}</span>
-              <span>{link.label}</span>
-            </Link>
-          ))}
-        </div>
+              <span className="bottom-nav-item-indicator" aria-hidden />
+              <NavIcon name={item.icon} active={active} />
+              <span className="bottom-nav-item-label">{label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );

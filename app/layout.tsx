@@ -43,7 +43,7 @@ export default async function RootLayout({
               <FlagMarquee />
             </div>
           </div>
-          <main className="flex-1 w-full px-4 py-6 md:py-8 pb-24 md:pb-10">
+          <main className="flex-1 w-full px-4 py-6 md:py-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-10">
             {children}
           </main>
           <BottomNav isAdmin={session?.is_admin} />
