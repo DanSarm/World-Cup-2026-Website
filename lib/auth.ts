@@ -119,7 +119,7 @@ export async function getSettings(): Promise<Settings> {
 }
 
 async function findPlayerByDisplayName<
-  T extends Record<string, unknown>,
+  T extends { display_name: string },
 >(select: string, displayName: string): Promise<T | null> {
   const supabase = getSupabase();
   const key = normalizedDisplayNameKey(displayName);
@@ -130,9 +130,9 @@ async function findPlayerByDisplayName<
     return null;
   }
 
-  const matches = (data ?? []).filter(
-    (row) =>
-      normalizedDisplayNameKey(String(row.display_name)) === key
+  const rows = (data ?? []) as unknown as T[];
+  const matches = rows.filter(
+    (row) => normalizedDisplayNameKey(row.display_name) === key
   );
 
   if (matches.length > 1) {
@@ -154,7 +154,7 @@ export async function registerPlayer(input: {
   const displayName = normalizeDisplayName(input.displayName);
   const supabase = getSupabase();
 
-  const existing = await findPlayerByDisplayName<{ id: string }>(
+  const existing = await findPlayerByDisplayName<{ id: string; display_name: string }>(
     "id, display_name",
     displayName
   );
