@@ -15,8 +15,8 @@ import { getEffectiveMatchPrediction, isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { filterCommunityPicksByMatchForViewer } from "./pickVisibility";
-import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync, isMatchInPlayWindow } from "./matchLive";
-import { parseISO } from "date-fns";
+import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync } from "./matchLive";
+import { shouldPromoteScheduledMatchWithScores } from "./matchFinalize";
 import {
   findLatestDecidedMatch,
   rankMovementFromRanks,
@@ -397,11 +397,7 @@ async function finalizeScheduledMatchesWithScores(
   const now = Date.now();
 
   for (const match of matches) {
-    if (match.status !== "scheduled") continue;
-    if (match.home_score === null || match.away_score === null) continue;
-    if (!match.kickoff_at) continue;
-    if (isMatchInPlayWindow(match)) continue;
-    if (parseISO(match.kickoff_at).getTime() > now) continue;
+    if (!shouldPromoteScheduledMatchWithScores(match, now)) continue;
 
     const { error } = await supabase
       .from("matches")

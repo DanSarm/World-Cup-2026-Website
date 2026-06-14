@@ -1,6 +1,7 @@
 /**
- * Restore match scores cleared in error on 2026-06-14.
- * These matches were played; status was wrongly "scheduled" but scores were real.
+ * EMERGENCY ONLY — restore match scores after accidental wipe.
+ * Requires known correct scores. DB trigger blocks clearing scores when picks exist.
+ * Usage: npx tsx scripts/restore-cleared-match-scores.ts
  */
 import { resolve } from "path";
 import { config } from "dotenv";
