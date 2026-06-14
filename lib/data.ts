@@ -15,7 +15,8 @@ import { getEffectiveMatchPrediction, isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { filterCommunityPicksByMatchForViewer } from "./pickVisibility";
-import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync } from "./matchLive";
+import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync, isMatchInPlayWindow } from "./matchLive";
+import { parseISO } from "date-fns";
 import {
   findLatestDecidedMatch,
   rankMovementFromRanks,
@@ -387,6 +388,30 @@ async function finalizeCompletedMatches(matches: Match[]): Promise<number> {
   return count;
 }
 
+/** Promote played matches that have scores but were left as scheduled (sync bug). */
+async function finalizeScheduledMatchesWithScores(
+  matches: Match[]
+): Promise<number> {
+  const supabase = getSupabase();
+  let count = 0;
+  const now = Date.now();
+
+  for (const match of matches) {
+    if (match.status !== "scheduled") continue;
+    if (match.home_score === null || match.away_score === null) continue;
+    if (!match.kickoff_at) continue;
+    if (isMatchInPlayWindow(match)) continue;
+    if (parseISO(match.kickoff_at).getTime() > now) continue;
+
+    const { error } = await supabase
+      .from("matches")
+      .update({ status: "final", updated_at: new Date().toISOString() })
+      .eq("id", match.id);
+    if (!error) count++;
+  }
+  return count;
+}
+
 export async function getLeaderboardData(options?: {
   includeLiveScores?: boolean;
   /** Skip ESPN/API score sync during SSR — client polls instead (fixes slow iOS loads). */
@@ -414,6 +439,9 @@ export async function getLeaderboardData(options?: {
   }
 
   if (await finalizeCompletedMatches(matches)) {
+    matches = await getMatchesWithTeams();
+  }
+  if (await finalizeScheduledMatchesWithScores(matches)) {
     matches = await getMatchesWithTeams();
   }
   const [players, scoredPredictions, podiumPredictions, finalsPredictions, adjustments, actualResults, settings, teams] =
