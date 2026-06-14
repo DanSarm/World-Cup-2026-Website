@@ -97,6 +97,7 @@ body {
   background: var(--color-white);
   border: 1px solid rgb(0 0 0 / 0.06);
   box-shadow: var(--shadow-card);
+  color: var(--color-ink);
 }
 
 .card-highlight {
