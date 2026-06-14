@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { CommunityMatchPick } from "@/lib/data";
+import type { CommunityMatchPick } from "@/lib/types";
 import type { Match, MatchPrediction } from "@/lib/types";
 import type { ScoringConfig } from "@/lib/scoringConfig";
 import { MatchCard } from "./MatchCard";

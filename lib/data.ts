@@ -27,17 +27,18 @@ import { resolveMatchesForPicks } from "./resolvedMatches";
 import type {
   ActualTournamentResults,
   BigPrediction,
+  CommunityMatchPick,
   FinalsChallengePrediction,
   LeaderboardEntry,
   ManualAdjustment,
   Match,
   MatchPrediction,
-  PickFormSlot,
   Player,
-  PlayerPodiumDisplay,
   Team,
   TournamentPodiumPrediction,
 } from "./types";
+
+export type { CommunityMatchPick } from "./types";
 
 export async function getTeams(): Promise<Team[]> {
   try {
@@ -107,17 +108,6 @@ export async function getPredictions(
   if (playerId) query = query.eq("player_id", playerId);
   const { data } = await query;
   return (data ?? []) as MatchPrediction[];
-}
-
-export interface CommunityMatchPick {
-  playerId: string;
-  displayName: string;
-  avatarEmoji: string;
-  predHomeScore: number;
-  predAwayScore: number;
-  predWinnerTeamId: string | null;
-  podiumPicks?: PlayerPodiumDisplay | null;
-  recentForm?: PickFormSlot[];
 }
 
 export async function getConfirmedMatchPicks(

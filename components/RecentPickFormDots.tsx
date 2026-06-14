@@ -1,3 +1,5 @@
+"use client";
+
 import type { PickFormSlot } from "@/lib/types";
 import {
   padPickFormSlots,

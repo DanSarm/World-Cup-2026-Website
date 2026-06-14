@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { PicksMatchCard } from "./PicksMatchCard";
-import type { CommunityMatchPick } from "@/lib/data";
+import type { CommunityMatchPick } from "@/lib/types";
 import { usePicksRefresh } from "@/lib/hooks/usePicksRefresh";
 import { PageHeader } from "./PageHeader";
 import {

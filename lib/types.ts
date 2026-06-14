@@ -165,6 +165,17 @@ export type PickFormLiveResult =
 export type PickFormResult = PickFormFinalResult | PickFormLiveResult;
 export type PickFormSlot = PickFormResult | null;
 
+export interface CommunityMatchPick {
+  playerId: string;
+  displayName: string;
+  avatarEmoji: string;
+  predHomeScore: number;
+  predAwayScore: number;
+  predWinnerTeamId: string | null;
+  podiumPicks?: PlayerPodiumDisplay | null;
+  recentForm?: PickFormSlot[];
+}
+
 export interface PlayerPodiumDisplay {
   first: PodiumTeamRef | null;
   second: PodiumTeamRef | null;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CommunityMatchPick } from "@/lib/data";
+import type { CommunityMatchPick } from "@/lib/types";
 import { isAnyMatchNeedingScoreSync } from "@/lib/matchLive";
 import type { PickReminderPayload, PickScheduleItem } from "@/lib/pickReminders";
 import type { Match, MatchPrediction } from "@/lib/types";
@@ -25,6 +25,12 @@ export interface PicksSnapshotPayload {
   pickSchedules?: PickScheduleItem[];
 }
 
+function isPicksSnapshotPayload(value: unknown): value is PicksSnapshotPayload {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return Array.isArray(record.matches) && Array.isArray(record.predictions);
+}
+
 export function usePicksRefresh(enabled = true) {
   const [data, setData] = useState<PicksSnapshotPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +42,8 @@ export function usePicksRefresh(enabled = true) {
     try {
       const res = await fetch("/api/picks-snapshot", { cache: "no-store" });
       if (!res.ok) return;
-      const json = (await res.json()) as PicksSnapshotPayload;
+      const json: unknown = await res.json();
+      if (!isPicksSnapshotPayload(json)) return;
       if (mountedRef.current) setData(json);
     } catch {
       /* ignore transient network errors */
@@ -45,7 +52,9 @@ export function usePicksRefresh(enabled = true) {
     }
   }, [enabled]);
 
-  const liveActive = data ? isAnyMatchNeedingScoreSync(data.matches) : true;
+  const liveActive = data?.matches?.length
+    ? isAnyMatchNeedingScoreSync(data.matches)
+    : true;
   const pollIntervalMs = liveActive ? LIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
 
   useEffect(() => {

@@ -1,5 +1,13 @@
 /* eslint-disable no-restricted-globals */
-/* Push notifications only — no fetch handler (keeps iOS Safari page loads reliable). */
+/* v2 — push only; no fetch handler (keeps iOS Safari page loads reliable). */
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener("push", (event) => {
   let payload = {

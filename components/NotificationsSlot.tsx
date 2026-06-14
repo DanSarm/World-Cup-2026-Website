@@ -1,20 +1,27 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import { ClientErrorBoundary } from "@/components/ClientErrorBoundary";
+import { NotificationProvider } from "@/components/NotificationProvider";
 
-const NotificationProvider = dynamic(
-  () =>
-    import("@/components/NotificationProvider").then(
-      (m) => m.NotificationProvider
-    ),
-  { ssr: false }
-);
-
+/**
+ * Notifications load after hydration so iOS Safari finishes painting the page
+ * first and a notification failure cannot block the main UI.
+ */
 export function NotificationsSlot({ enabled }: { enabled: boolean }) {
-  if (!enabled) return null;
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  if (!enabled || !ready) return null;
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <NotificationProvider enabled={enabled} />
-    </div>
+    <ClientErrorBoundary silent>
+      <div className="max-w-2xl mx-auto">
+        <NotificationProvider enabled={enabled} />
+      </div>
+    </ClientErrorBoundary>
   );
 }

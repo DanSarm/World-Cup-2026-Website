@@ -2,7 +2,7 @@
 
 import { useState, Fragment, type ReactNode } from "react";
 import { hasDisplayableLiveScore, isMatchDecidedForScoring } from "@/lib/matchLive";
-import type { CommunityMatchPick } from "@/lib/data";
+import type { CommunityMatchPick } from "@/lib/types";
 import {
   isPickExactImpossible,
   isPickLiveEliminated,
