@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  playScoreStepDownSound,
+  playScoreStepUpSound,
+} from "@/lib/pickLockSound";
+
 interface ScoreControlProps {
   value: number | null;
   onChange: (v: number | null) => void;
@@ -13,6 +18,18 @@ export function ScoreControl({
   disabled,
   compact = false,
 }: ScoreControlProps) {
+  function increment() {
+    if (disabled || (value !== null && value >= 20)) return;
+    playScoreStepUpSound();
+    onChange(value === null ? 0 : value + 1);
+  }
+
+  function decrement() {
+    if (disabled || value === null || value <= 0) return;
+    playScoreStepDownSound();
+    onChange(Math.max(0, value - 1));
+  }
+
   if (compact) {
     return (
       <div
@@ -23,7 +40,7 @@ export function ScoreControl({
         <button
           type="button"
           disabled={disabled || value === null || value <= 0}
-          onClick={() => onChange(value === null ? null : Math.max(0, value - 1))}
+          onClick={decrement}
           className="score-stepper-btn"
           aria-label="Decrease score"
         >
@@ -54,7 +71,7 @@ export function ScoreControl({
         <button
           type="button"
           disabled={disabled || value !== null && value >= 20}
-          onClick={() => onChange(value === null ? 0 : value + 1)}
+          onClick={increment}
           className="score-stepper-btn"
           aria-label="Increase score"
         >
@@ -69,7 +86,7 @@ export function ScoreControl({
       <button
         type="button"
         disabled={disabled || (value !== null && value >= 20)}
-        onClick={() => onChange(value === null ? 0 : value + 1)}
+        onClick={increment}
         className="score-btn"
         aria-label="Increase score"
       >
@@ -98,7 +115,7 @@ export function ScoreControl({
       <button
         type="button"
         disabled={disabled || value === null || value <= 0}
-        onClick={() => onChange(value === null ? null : Math.max(0, value - 1))}
+        onClick={decrement}
         className="score-btn"
         aria-label="Decrease score"
       >

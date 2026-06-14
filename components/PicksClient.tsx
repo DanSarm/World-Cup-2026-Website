@@ -28,6 +28,7 @@ interface PicksClientProps {
   currentPlayerId: string;
   totalPlayers: number;
   communityPicksByMatchId: Record<string, CommunityMatchPick[]>;
+  communityPickCountsByMatchId: Record<string, number>;
 }
 
 const FILTERS: { key: PicksFilter; label: string }[] = [
@@ -48,6 +49,7 @@ export function PicksClient({
   currentPlayerId,
   totalPlayers,
   communityPicksByMatchId,
+  communityPickCountsByMatchId,
 }: PicksClientProps) {
   const [filter, setFilter] = useState<PicksFilter>("need");
   const [teamFilter, setTeamFilter] = useState<string>("");
@@ -57,6 +59,8 @@ export function PicksClient({
   const livePredictions = snapshot?.predictions ?? predictions;
   const liveCommunityPicks =
     snapshot?.communityPicksByMatchId ?? communityPicksByMatchId;
+  const liveCommunityPickCounts =
+    snapshot?.communityPickCountsByMatchId ?? communityPickCountsByMatchId;
   const liveTotalPlayers = snapshot?.totalPlayers ?? totalPlayers;
 
   const predMap = useMemo(
@@ -95,7 +99,6 @@ export function PicksClient({
   return (
     <div className="space-y-6">
       <PageHeader
-        flags={["USA", "MEX", "CAN", "BRA"]}
         title="Picks"
         subtitle="Pick scores before kickoff · Every game counts"
       />
@@ -178,6 +181,7 @@ export function PicksClient({
                   picks={liveCommunityPicks[m.id] ?? []}
                   currentPlayerId={currentPlayerId}
                   totalPlayers={liveTotalPlayers}
+                  predictedCount={liveCommunityPickCounts[m.id]}
                   onPickSaved={refresh}
                 />
               ))}

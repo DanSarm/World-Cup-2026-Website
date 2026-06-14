@@ -1,5 +1,7 @@
 "use client";
 
+import { ensurePickLockAudio } from "@/lib/pickLockSound";
+
 export function PickLockButton({
   isLocked,
   isSaving,
@@ -14,10 +16,15 @@ export function PickLockButton({
 }) {
   const lockDisabled = isSaving || (!isLocked && !canLock);
 
+  function handleClick() {
+    ensurePickLockAudio();
+    onClick();
+  }
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={lockDisabled}
       title={
         isLocked
@@ -27,9 +34,9 @@ export function PickLockButton({
             : "Set both scores before locking"
       }
       aria-label={isLocked ? "Unlock pick" : "Lock pick"}
-      className={`pick-lock-btn ${isLocked ? "pick-lock-btn--locked" : ""} ${
-        lockDisabled && !isLocked ? "pick-lock-btn--disabled" : ""
-      }`}
+      className={`pick-lock-btn ${
+        isLocked ? "pick-lock-btn--locked" : "pick-lock-btn--open"
+      } ${lockDisabled && !isLocked ? "pick-lock-btn--disabled" : ""}`}
     >
       {isSaving ? (
         <span className="pick-lock-spinner" aria-hidden />
@@ -46,16 +53,23 @@ function LockOpenIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M7 10V8a5 5 0 0 1 9.9-1"
+        d="M4 11V8a6 6 0 0 1 11.3-2.8"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
       />
+      <path
+        d="M8 8V6a4 4 0 0 1 7.5-1.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.45"
+      />
       <rect
         x="5"
-        y="10"
+        y="11"
         width="14"
-        height="11"
+        height="10"
         rx="2"
         stroke="currentColor"
         strokeWidth="2"

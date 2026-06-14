@@ -107,12 +107,11 @@ export function LeaderboardTable({
               </span>
             )}
           </p>
-          <p className="lb-entry-meta">
-            {entry.picksMade} {entry.picksMade === 1 ? "pick" : "picks"}
-            {entry.exactScores > 0 && (
-              <span> · {entry.exactScores} exact</span>
-            )}
-          </p>
+          {entry.exactScores > 0 && (
+            <p className="lb-entry-meta">
+              <span>{entry.exactScores} exact</span>
+            </p>
+          )}
         </div>
 
         <RecentPickFormDots

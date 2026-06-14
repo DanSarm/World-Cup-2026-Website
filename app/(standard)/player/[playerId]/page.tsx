@@ -14,8 +14,13 @@ export default async function PlayerProfilePage({
   if (!session) redirect("/login");
 
   const { playerId } = await params;
-  const profile = await getPlayerProfileData(playerId);
+  const profile = await getPlayerProfileData(playerId, session.id);
   if (!profile) notFound();
 
-  return <PlayerProfileClient profile={profile} />;
+  return (
+    <PlayerProfileClient
+      profile={profile}
+      isOwnProfile={session.id === profile.playerId}
+    />
+  );
 }

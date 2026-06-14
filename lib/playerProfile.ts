@@ -17,8 +17,9 @@ import {
   countPerfectDays,
   scoreMatchPrediction,
 } from "./scoring";
-import { scoringConfigFromSettings, type ScoringConfig } from "./scoringConfig";
+import { previewPickRewards, scoringConfigFromSettings, type ScoringConfig } from "./scoringConfig";
 import { formatMatchScoreBreakdownLines } from "./scoreBreakdownDisplay";
+import { canRevealOtherPlayersPicks } from "./pickVisibility";
 import {
   hasDisplayableLiveScore,
   isMatchDecidedForScoring,
@@ -32,13 +33,34 @@ import type {
   PlayerPodiumDisplay,
   TournamentPodiumPrediction,
 } from "./types";
+import { canPickMatch } from "./utils";
 import { getStageLabel } from "./types";
 import { syncLiveScores } from "./scores/sync";
 
+export type AchievementTier = "legendary" | "gold" | "silver" | "bronze";
+
+export type AchievementIcon =
+  | "trophy"
+  | "medal-2"
+  | "medal-3"
+  | "target"
+  | "flame"
+  | "rocket"
+  | "chart"
+  | "dice"
+  | "star"
+  | "cash"
+  | "shield";
+
 export interface PlayerAchievement {
-  icon: string;
+  id: string;
+  tier: AchievementTier;
+  icon: AchievementIcon;
   title: string;
-  detail: string;
+  /** Short headline stat — e.g. "3 exact", "42 pts" */
+  stat?: string;
+  /** One-line context — match name, payout tier, etc. */
+  subtitle?: string;
 }
 
 export type PlayerPickStatus = "upcoming" | "live" | "scored" | "missed";
@@ -104,11 +126,96 @@ export interface PlayerProfileData {
   hasLiveScoring: boolean;
 }
 
-function highlightDetail(detail: string | string[] | undefined, fallback: string): string {
-  if (Array.isArray(detail)) return detail[0] ?? fallback;
-  return detail ?? fallback;
+const TIER_RANK: Record<AchievementTier, number> = {
+  legendary: 0,
+  gold: 1,
+  silver: 2,
+  bronze: 3,
+};
+
+function matchTeamsLabel(match: Match): string {
+  const home = match.home_team?.short_name ?? match.home_label;
+  const away = match.away_team?.short_name ?? match.away_label;
+  return `${home} vs ${away}`;
 }
 
+function climberSubtitle(detail: string | string[] | undefined): string {
+  const line = Array.isArray(detail) ? detail[0] : detail;
+  if (!line) return "Moved up the board";
+  return line.replace(/^Up /, "↑ ").replace(" since tournament start", "");
+}
+
+function findPlayerBestScoredPick(
+  playerId: string,
+  matches: Match[],
+  predictions: MatchPrediction[],
+  scoringConfig: ScoringConfig
+): { points: number; match: Match; predHome: number; predAway: number } | null {
+  let best: { points: number; match: Match; predHome: number; predAway: number } | null =
+    null;
+
+  for (const match of matches.filter(isMatchDecidedForScoring)) {
+    if (match.home_score === null || match.away_score === null) continue;
+    const pred = predictions.find(
+      (p) => p.player_id === playerId && p.match_id === match.id && isConfirmedPick(p)
+    );
+    if (!pred) continue;
+
+    const { points } = scoreMatchPrediction(match, pred, scoringConfig);
+    if (!best || points > best.points) {
+      best = {
+        points,
+        match,
+        predHome: pred.pred_home_score,
+        predAway: pred.pred_away_score,
+      };
+    }
+  }
+
+  return best && best.points > 0 ? best : null;
+}
+
+function findPlayerChaosPick(
+  playerId: string,
+  matches: Match[],
+  predictions: MatchPrediction[],
+  scoringConfig: ScoringConfig
+): { points: number; match: Match; predHome: number; predAway: number } | null {
+  let best: { points: number; match: Match; predHome: number; predAway: number } | null =
+    null;
+
+  for (const match of matches.filter(canPickMatch)) {
+    const pred = predictions.find(
+      (p) => p.player_id === playerId && p.match_id === match.id && isConfirmedPick(p)
+    );
+    if (!pred) continue;
+
+    const preview = previewPickRewards(
+      match,
+      pred.pred_home_score,
+      pred.pred_away_score,
+      scoringConfig,
+      pred.pred_winner_team_id
+    );
+
+    if (!best || preview.maxPoints > best.points) {
+      best = {
+        points: preview.maxPoints,
+        match,
+        predHome: pred.pred_home_score,
+        predAway: pred.pred_away_score,
+      };
+    }
+  }
+
+  return best && best.points > 0 ? best : null;
+}
+
+function sortAchievements(achievements: PlayerAchievement[]): PlayerAchievement[] {
+  return [...achievements].sort(
+    (a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier]
+  );
+}
 function highlightIncludesPlayer(
   highlight: HighlightCard | null,
   name: string
@@ -120,30 +227,54 @@ function highlightIncludesPlayer(
 export function computePlayerAchievements(
   entry: LeaderboardEntry,
   poolHighlights: PoolHighlights,
-  perfectDays: number
+  perfectDays: number,
+  context?: {
+    playerId: string;
+    matches: Match[];
+    predictions: MatchPrediction[];
+    scoringConfig: ScoringConfig;
+  }
 ): PlayerAchievement[] {
   const achievements: PlayerAchievement[] = [];
   const name = entry.displayName;
+  const displayPoints = entry.provisionalTotalPoints ?? entry.totalPoints;
 
   if (entry.rank === 1) {
     achievements.push({
-      icon: "👑",
+      id: "current-leader",
+      tier: "legendary",
+      icon: "trophy",
       title: "Current Leader",
-      detail: `${entry.provisionalTotalPoints ?? entry.totalPoints} pts`,
+      stat: `${displayPoints} pts`,
+      subtitle: "Top of the board",
     });
-  } else if (entry.rank <= 3) {
+  } else if (entry.rank === 2) {
     achievements.push({
-      icon: "🏆",
-      title: `Rank #${entry.rank}`,
-      detail: "On the leaderboard podium",
+      id: "rank-2",
+      tier: "gold",
+      icon: "medal-2",
+      title: "2nd Place",
+      stat: `${displayPoints} pts`,
+      subtitle: "Leaderboard podium",
+    });
+  } else if (entry.rank === 3) {
+    achievements.push({
+      id: "rank-3",
+      tier: "gold",
+      icon: "medal-3",
+      title: "3rd Place",
+      stat: `${displayPoints} pts`,
+      subtitle: "Leaderboard podium",
     });
   }
 
   if (entry.paid) {
     achievements.push({
-      icon: "💵",
+      id: "prize-pool",
+      tier: "bronze",
+      icon: "shield",
       title: "Prize Pool",
-      detail: "Competing for cash prizes",
+      subtitle: "Playing for cash",
     });
   }
 
@@ -152,9 +283,12 @@ export function computePlayerAchievements(
     highlightIncludesPlayer(poolHighlights.exactKing, name)
   ) {
     achievements.push({
-      icon: "🎯",
+      id: "exact-king",
+      tier: "gold",
+      icon: "target",
       title: "Exact King",
-      detail: `${entry.exactScores} exact score${entry.exactScores === 1 ? "" : "s"}`,
+      stat: `${entry.exactScores} exact`,
+      subtitle: "Most bullseyes in the pool",
     });
   }
 
@@ -163,76 +297,97 @@ export function computePlayerAchievements(
     highlightIncludesPlayer(poolHighlights.miracleMaker, name)
   ) {
     achievements.push({
-      icon: "🚀",
+      id: "miracle-maker",
+      tier: "gold",
+      icon: "rocket",
       title: "Miracle Maker",
-      detail: `${entry.miraclePoints} miracle pts`,
+      stat: `${entry.miraclePoints} pts`,
+      subtitle: "Underdog bonus king",
     });
   }
 
   if (highlightIncludesPlayer(poolHighlights.biggestClimber, name)) {
     achievements.push({
-      icon: "📈",
+      id: "biggest-climber",
+      tier: "silver",
+      icon: "chart",
       title: "Biggest Climber",
-      detail: highlightDetail(
-        poolHighlights.biggestClimber?.detail,
-        "Moved up the board"
-      ),
+      subtitle: climberSubtitle(poolHighlights.biggestClimber?.detail),
     });
   }
 
-  if (highlightIncludesPlayer(poolHighlights.bestPick, name)) {
+  if (highlightIncludesPlayer(poolHighlights.bestPick, name) && context) {
+    const best = findPlayerBestScoredPick(
+      context.playerId,
+      context.matches,
+      context.predictions,
+      context.scoringConfig
+    );
     achievements.push({
-      icon: "🔥",
+      id: "best-pick",
+      tier: "gold",
+      icon: "flame",
       title: "Best Pick",
-      detail: highlightDetail(
-        poolHighlights.bestPick?.detail,
-        "Top single-match haul"
-      ),
+      stat: best ? `${best.points} pts` : undefined,
+      subtitle: best ? matchTeamsLabel(best.match) : "Top single-match haul",
     });
   }
 
-  if (highlightIncludesPlayer(poolHighlights.chaosPick, name)) {
+  if (highlightIncludesPlayer(poolHighlights.chaosPick, name) && context) {
+    const chaos = findPlayerChaosPick(
+      context.playerId,
+      context.matches,
+      context.predictions,
+      context.scoringConfig
+    );
     achievements.push({
-      icon: "🎲",
+      id: "chaos-pick",
+      tier: "gold",
+      icon: "dice",
       title: "Chaos Pick",
-      detail: highlightDetail(
-        poolHighlights.chaosPick?.detail,
-        "Bold underdog call"
-      ),
+      stat: chaos ? `Up to ${chaos.points}` : undefined,
+      subtitle: chaos ? matchTeamsLabel(chaos.match) : "Bold underdog call",
     });
   }
 
-  if (highlightIncludesPlayer(poolHighlights.perfectDayClub, name)) {
+  if (perfectDays > 0) {
+    const inClub = highlightIncludesPlayer(poolHighlights.perfectDayClub, name);
     achievements.push({
-      icon: "⭐",
-      title: "Perfect Day Club",
-      detail: highlightDetail(poolHighlights.perfectDayClub.detail, "Perfect day"),
-    });
-  } else if (perfectDays > 0) {
-    achievements.push({
-      icon: "⭐",
-      title: "Perfect Day",
-      detail: `${perfectDays} day${perfectDays === 1 ? "" : "s"} with every pick correct`,
+      id: inClub ? "perfect-day-club" : "perfect-day",
+      tier: inClub ? "gold" : "silver",
+      icon: "star",
+      title: inClub ? "Perfect Day Club" : "Perfect Day",
+      stat:
+        perfectDays === 1 ? "1× perfect" : `${perfectDays}× perfect`,
+      subtitle: "Every pick correct on a busy day",
     });
   }
 
-  if (entry.exactScores >= 3 && !highlightIncludesPlayer(poolHighlights.exactKing, name)) {
+  if (
+    entry.exactScores >= 3 &&
+    !highlightIncludesPlayer(poolHighlights.exactKing, name)
+  ) {
     achievements.push({
-      icon: "🎯",
+      id: "sharpshooter",
+      tier: "silver",
+      icon: "target",
       title: "Sharpshooter",
-      detail: `${entry.exactScores} exact scores`,
+      stat: `${entry.exactScores} exact`,
+      subtitle: "On the mark",
     });
   }
 
   if (entry.projectedPrize > 0 && entry.paid) {
     achievements.push({
-      icon: "💰",
+      id: "in-the-money",
+      tier: "gold",
+      icon: "cash",
       title: "In the Money",
-      detail: `Projected ${entry.prizeLabel.toLowerCase()} payout`,
+      subtitle: entry.prizeLabel,
     });
   }
 
-  return achievements;
+  return sortAchievements(achievements);
 }
 
 function pickStatus(match: Match): PlayerPickStatus {
@@ -335,7 +490,8 @@ export function buildPlayerPickSummariesWithConfig(
 }
 
 export async function getPlayerProfileData(
-  playerId: string
+  playerId: string,
+  viewerPlayerId?: string
 ): Promise<PlayerProfileData | null> {
   const players = await getPlayers();
   const player = players.find((p) => p.id === playerId);
@@ -409,6 +565,15 @@ export async function getPlayerProfileData(
     leaderboardBundle.hasLiveScoring
   );
 
+  const isOwnProfile = !viewerPlayerId || viewerPlayerId === playerId;
+  const matchesById = new Map(matches.map((m) => [m.id, m]));
+  const visiblePicks = isOwnProfile
+    ? picks
+    : picks.filter((pick) => {
+        const match = matchesById.get(pick.matchId);
+        return match != null && canRevealOtherPlayersPicks(match);
+      });
+
   const pointsBreakdown: PlayerPointsBreakdown = {
     matchPoints: entry.matchPoints,
     groupStagePoints: entry.groupStagePoints,
@@ -437,8 +602,13 @@ export async function getPlayerProfileData(
     pointsBreakdown,
     podiumPicks,
     podiumPrediction,
-    picks,
-    achievements: computePlayerAchievements(entry, poolHighlights, perfectDays),
+    picks: visiblePicks,
+    achievements: computePlayerAchievements(entry, poolHighlights, perfectDays, {
+      playerId,
+      matches,
+      predictions: allPredictions,
+      scoringConfig,
+    }),
     recentForm: entry.recentForm,
     perfectDays,
     picksMade: entry.picksMade,

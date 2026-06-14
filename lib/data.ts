@@ -14,6 +14,7 @@ import { buildProjectedPrizes } from "./payouts";
 import { getEffectiveMatchPrediction, isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
+import { filterCommunityPicksByMatchForViewer } from "./pickVisibility";
 import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchInPlayWindow } from "./matchLive";
 import { mergeLiveClocks } from "./liveClock";
 import { matchDateKey } from "./utils";
@@ -530,11 +531,20 @@ export async function getPicksSnapshot(playerId: string) {
     getConfirmedMatchPicksByMatchIds(matchIds),
   ]);
 
+  const communityPickCountsByMatchId = Object.fromEntries(
+    [...communityPicksByMatchId.entries()].map(([id, picks]) => [id, picks.length])
+  );
+
   return {
     syncedAt: new Date().toISOString(),
     matches: pickMatches,
     predictions,
-    communityPicksByMatchId: Object.fromEntries(communityPicksByMatchId),
+    communityPicksByMatchId: filterCommunityPicksByMatchForViewer(
+      communityPicksByMatchId,
+      pickMatches,
+      playerId
+    ),
+    communityPickCountsByMatchId,
     totalPlayers: players.length,
     hasLiveScoring: hasAnyDisplayableLiveScore(matches),
   };

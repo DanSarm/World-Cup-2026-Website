@@ -156,6 +156,30 @@ export function withLiveFormSlot(
   return slots;
 }
 
+function compareMatchesChronologically(a: Match, b: Match): number {
+  const ka = a.kickoff_at ?? "";
+  const kb = b.kickoff_at ?? "";
+  if (ka !== kb) return ka.localeCompare(kb);
+  return a.match_number - b.match_number;
+}
+
+/** Display-only default for form dots — never written to the database. */
+const DEFAULT_MISSING_FORM_PICK = {
+  pred_home_score: 0,
+  pred_away_score: 0,
+  pred_winner_team_id: null,
+} as const;
+
+function getFormDisplayPick(
+  match: Pick<Match, "status" | "kickoff_at">,
+  prediction?: MatchPrediction | null
+): Pick<
+  MatchPrediction,
+  "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
+> {
+  return getEffectiveMatchPrediction(match, prediction) ?? DEFAULT_MISSING_FORM_PICK;
+}
+
 export function buildPlayerRecentForm(
   playerId: string,
   matches: Match[],
@@ -171,15 +195,11 @@ export function buildPlayerRecentForm(
 
   const resultMatches = matches
     .filter((m) => m.status === "final" || hasDisplayableLiveScore(m))
-    .sort((a, b) => a.match_number - b.match_number);
+    .sort(compareMatchesChronologically);
 
   const results: PickFormResult[] = [];
   for (const match of resultMatches) {
-    const pred = getEffectiveMatchPrediction(
-      match,
-      predByMatchId.get(match.id)
-    );
-    if (!pred) continue;
+    const pred = getFormDisplayPick(match, predByMatchId.get(match.id));
     const result =
       match.status === "final"
         ? classifyPickResult(match, pred, scoringConfig)

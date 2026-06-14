@@ -12,6 +12,7 @@ import {
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
 import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { resolveMatchesForPicks } from "@/lib/resolvedMatches";
+import { filterCommunityPicksByMatchForViewer } from "@/lib/pickVisibility";
 import { PicksClient } from "@/components/PicksClient";
 
 export default async function PicksPage() {
@@ -33,8 +34,16 @@ export default async function PicksPage() {
   const worldCupKickoff = getWorldCupKickoff(matches);
 
   const pickMatches = resolveMatchesForPicks(matches);
-  const communityPicksByMatchId = await getConfirmedMatchPicksByMatchIds(
+  const communityPicksRaw = await getConfirmedMatchPicksByMatchIds(
     pickMatches.map((m) => m.id)
+  );
+  const communityPickCountsByMatchId = Object.fromEntries(
+    [...communityPicksRaw.entries()].map(([id, picks]) => [id, picks.length])
+  );
+  const communityPicksByMatchId = filterCommunityPicksByMatchForViewer(
+    communityPicksRaw,
+    pickMatches,
+    session.id
   );
 
   return (
@@ -48,7 +57,8 @@ export default async function PicksPage() {
       worldCupKickoff={worldCupKickoff}
       currentPlayerId={session.id}
       totalPlayers={players.length}
-      communityPicksByMatchId={Object.fromEntries(communityPicksByMatchId)}
+      communityPicksByMatchId={communityPicksByMatchId}
+      communityPickCountsByMatchId={communityPickCountsByMatchId}
     />
   );
 }

@@ -16,6 +16,7 @@ import {
   isMatchInPlayWindow,
   isMatchLive,
 } from "@/lib/matchLive";
+import { canRevealOtherPlayersPicks } from "@/lib/pickVisibility";
 import { canPickMatch } from "@/lib/utils";
 import { hasSavedPick } from "@/lib/pickUtils";
 import { UrgentPill } from "./UrgentPill";
@@ -29,6 +30,7 @@ interface HomeFeaturedMatchSectionProps {
   /** Override section heading (e.g. "Next game", "Up next"). */
   sectionLabel?: string;
   totalPlayers?: number;
+  predictedCount?: number;
 }
 
 export function HomeFeaturedMatchSection({
@@ -39,6 +41,7 @@ export function HomeFeaturedMatchSection({
   scoringConfig,
   sectionLabel,
   totalPlayers,
+  predictedCount,
 }: HomeFeaturedMatchSectionProps) {
   const pollLive = useMatchPollEnabled(initialMatch);
   const { data } = useLiveRefresh(pollLive);
@@ -50,12 +53,13 @@ export function HomeFeaturedMatchSection({
 
   const showingLiveScore = hasDisplayableLiveScore(match);
   const isLive = isMatchLive(match);
+  const picksRevealed = canRevealOtherPlayersPicks(match);
   const needsPick = canPickMatch(match) && !hasSavedPick(prediction);
   const heading =
     sectionLabel ?? (showingLiveScore || isLive ? "Live now" : "Upcoming game");
 
   const mostPickedScore = useMemo(() => {
-    if (!picks.length) return null;
+    if (!picksRevealed || !picks.length) return null;
     const counts = new Map<string, number>();
     for (const p of picks) {
       const key = `${p.predHomeScore}–${p.predAwayScore}`;
@@ -74,7 +78,7 @@ export function HomeFeaturedMatchSection({
       score: bestScore,
       percent: Math.round((bestCount / picks.length) * 100),
     };
-  }, [picks]);
+  }, [picks, picksRevealed]);
 
   return (
     <section className="card p-0 overflow-hidden">
@@ -90,7 +94,7 @@ export function HomeFeaturedMatchSection({
             ? "Live score updates on a schedule · standings reflect the current score"
             : isMatchInPlayWindow(match)
               ? "Waiting for live score sync…"
-              : "Make your pick, then see what everyone else is going with"}
+              : "Make your pick — everyone else's stay hidden until kickoff"}
         </p>
       </div>
       <MatchCard
@@ -109,6 +113,7 @@ export function HomeFeaturedMatchSection({
         embedded
         showLivePoints={showingLiveScore || isLive}
         totalPlayers={totalPlayers}
+        predictedCount={predictedCount}
       />
     </section>
   );

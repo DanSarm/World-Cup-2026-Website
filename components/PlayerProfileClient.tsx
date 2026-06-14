@@ -6,15 +6,20 @@ import type { PlayerProfileData, PlayerPickSummary } from "@/lib/playerProfile";
 import { PlayerPodiumFlags } from "./PlayerPodiumFlags";
 import { RecentPickFormDots } from "./RecentPickFormDots";
 import { RankMedal } from "./PlaceMedal";
-import { ScoreBreakdownList } from "./ScoreBreakdownList";
 import { Flag } from "./Flag";
-import { formatKickoff } from "@/lib/utils";
 import { formatMoney } from "@/lib/payouts";
+import { AchievementShowcase } from "./AchievementShowcase";
+import { ProfilePodiumShowcase } from "./ProfilePodiumShowcase";
 
-type PickFilter = "all" | "scored" | "upcoming";
+type PickFilter = "all" | "exact" | "correct" | "miss";
+
+function isDecidedPick(pick: PlayerPickSummary): boolean {
+  return pick.status === "scored" || pick.status === "live";
+}
 
 interface PlayerProfileClientProps {
   profile: PlayerProfileData;
+  isOwnProfile?: boolean;
 }
 
 function formatPickScore(pick: PlayerPickSummary): string {
@@ -28,24 +33,28 @@ function formatActualScore(pick: PlayerPickSummary): string | null {
   return `${pick.actualHome}–${pick.actualAway}`;
 }
 
-function PointsStat({
-  label,
-  value,
-  highlight = false,
-}: {
+function pickStageTag(pick: PlayerPickSummary): string {
+  if (pick.groupLetter) return `Group ${pick.groupLetter}`;
+  return pick.stageLabel;
+}
+
+function pickOutcomePill(pick: PlayerPickSummary): {
   label: string;
-  value: number;
-  highlight?: boolean;
-}) {
-  if (value === 0 && !highlight) return null;
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-ink-muted">{label}</span>
-      <span className={`font-semibold tabular-nums ${highlight ? "text-mexico" : "text-usa"}`}>
-        {value > 0 ? `+${value}` : value} pts
-      </span>
-    </div>
-  );
+  className: string;
+} {
+  if (pick.status === "upcoming") {
+    return { label: "Upcoming", className: "profile-pick-pill profile-pick-pill--upcoming" };
+  }
+  if (pick.status === "live") {
+    return { label: "Live", className: "profile-pick-pill profile-pick-pill--live" };
+  }
+  if (pick.exactScore) {
+    return { label: "Exact", className: "profile-pick-pill profile-pick-pill--exact" };
+  }
+  if (pick.correctResult) {
+    return { label: "Correct", className: "profile-pick-pill profile-pick-pill--correct" };
+  }
+  return { label: "Miss", className: "profile-pick-pill profile-pick-pill--miss" };
 }
 
 function PickCard({ pick }: { pick: PlayerPickSummary }) {
@@ -54,79 +63,65 @@ function PickCard({ pick }: { pick: PlayerPickSummary }) {
     pick.status === "live" && pick.livePoints != null
       ? pick.livePoints
       : pick.points;
+  const outcome = pickOutcomePill(pick);
+  const showPoints = pick.status === "scored" || pick.status === "live";
 
   return (
-    <article className="card p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 space-y-0.5">
-          <p className="text-xs font-semibold text-ink-faint uppercase tracking-wide">
-            #{pick.matchNumber}
-            {pick.groupLetter ? ` · Group ${pick.groupLetter}` : ""}
-            {" · "}
-            {pick.stageLabel}
-          </p>
-          <p className="font-bold text-usa leading-snug">
-            {pick.homeLabel} vs {pick.awayLabel}
-          </p>
-          {pick.kickoffAt && (
-            <p className="text-xs text-ink-muted">{formatKickoff(pick.kickoffAt)}</p>
-          )}
+    <article className="card profile-pick-card">
+      <div className="profile-pick-card-top">
+        <div className="profile-pick-pills">
+          <span className="profile-pick-pill profile-pick-pill--stage">
+            {pickStageTag(pick)}
+          </span>
+          <span className={outcome.className}>{outcome.label}</span>
         </div>
-        <div className="shrink-0 text-right">
-          {pick.status === "live" && (
-            <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-canada mb-1">
-              Live
-            </span>
-          )}
-          {pick.status === "scored" && (
-            <span
-              className={`inline-block text-[10px] font-bold uppercase tracking-wide mb-1 ${
-                pick.exactScore
-                  ? "text-mexico"
-                  : pick.correctResult
-                    ? "text-usa"
-                    : "text-ink-faint"
-              }`}
-            >
-              {pick.exactScore ? "Exact" : pick.correctResult ? "Correct" : "Miss"}
-            </span>
-          )}
-          {(pick.status === "scored" || pick.status === "live") && (
-            <p className="text-lg font-extrabold text-mexico tabular-nums leading-none">
-              {displayPoints}
-              <span className="text-[10px] font-semibold text-ink-faint ml-0.5">
-                pts
-              </span>
-            </p>
-          )}
+        {showPoints && (
+          <p className="profile-pick-points">
+            +{displayPoints}
+            <span className="profile-pick-points-unit">pts</span>
+          </p>
+        )}
+      </div>
+
+      <div className="profile-pick-matchup">
+        <div className="profile-pick-team">
+          <Flag fifaCode={pick.homeCode} size="sm" title={pick.homeLabel} />
+          <span className="profile-pick-team-name">{pick.homeLabel}</span>
+        </div>
+        <span className="profile-pick-vs">vs</span>
+        <div className="profile-pick-team profile-pick-team--away">
+          <Flag fifaCode={pick.awayCode} size="sm" title={pick.awayLabel} />
+          <span className="profile-pick-team-name">{pick.awayLabel}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg bg-ink/[0.03] px-2.5 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
-            Their pick
-          </p>
-          <p className="font-semibold text-usa mt-0.5">{formatPickScore(pick)}</p>
+      <div className="profile-pick-scores">
+        <div className="profile-pick-score-box">
+          <span className="profile-pick-score-label">Picked</span>
+          <span className="profile-pick-score-value">{formatPickScore(pick)}</span>
         </div>
-        <div className="rounded-lg bg-ink/[0.03] px-2.5 py-2">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
-            {pick.status === "upcoming" ? "Kickoff" : "Actual"}
-          </p>
-          <p className="font-semibold text-usa mt-0.5">
-            {actual ?? (pick.status === "upcoming" ? "—" : "Pending sync")}
-          </p>
+        <div className="profile-pick-score-box">
+          <span className="profile-pick-score-label">
+            {pick.status === "upcoming" ? "Kickoff" : "Final"}
+          </span>
+          <span className="profile-pick-score-value">
+            {actual ?? (pick.status === "upcoming" ? "—" : "Pending")}
+          </span>
         </div>
       </div>
 
       {pick.breakdownLines.length > 0 && (
-        <details className="group">
-          <summary className="cursor-pointer text-xs font-semibold text-gold-light hover:text-gold list-none flex items-center gap-1">
+        <details className="profile-pick-breakdown group">
+          <summary className="profile-pick-breakdown-toggle">
             <span className="group-open:rotate-90 transition-transform">▸</span>
-            Score breakdown
+            Points breakdown
           </summary>
-          <div className="mt-2 pl-3 border-l-2 border-ink/10">
-            <ScoreBreakdownList lines={pick.breakdownLines} />
+          <div className="profile-pick-breakdown-body">
+            <ul className="space-y-0.5 text-xs text-ink-muted">
+              {pick.breakdownLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </div>
         </details>
       )}
@@ -134,7 +129,10 @@ function PickCard({ pick }: { pick: PlayerPickSummary }) {
   );
 }
 
-export function PlayerProfileClient({ profile }: PlayerProfileClientProps) {
+export function PlayerProfileClient({
+  profile,
+  isOwnProfile = false,
+}: PlayerProfileClientProps) {
   const [pickFilter, setPickFilter] = useState<PickFilter>("all");
 
   const displayTotal =
@@ -144,10 +142,15 @@ export function PlayerProfileClient({ profile }: PlayerProfileClientProps) {
 
   const filteredPicks = useMemo(() => {
     if (pickFilter === "all") return profile.picks;
-    if (pickFilter === "scored") {
-      return profile.picks.filter((p) => p.status === "scored" || p.status === "live");
+    if (pickFilter === "exact") {
+      return profile.picks.filter((p) => isDecidedPick(p) && p.exactScore);
     }
-    return profile.picks.filter((p) => p.status === "upcoming");
+    if (pickFilter === "correct") {
+      return profile.picks.filter(
+        (p) => isDecidedPick(p) && p.correctResult && !p.exactScore
+      );
+    }
+    return profile.picks.filter((p) => isDecidedPick(p) && !p.correctResult);
   }, [profile.picks, pickFilter]);
 
   const pb = profile.pointsBreakdown;
@@ -194,8 +197,13 @@ export function PlayerProfileClient({ profile }: PlayerProfileClientProps) {
               )}
             </p>
             <p className="text-sm text-ink-muted mt-1">
-              {profile.picksMade} picks · {profile.exactScores} exact ·{" "}
-              {profile.correctResults} correct results
+              {isOwnProfile && (
+                <>
+                  {profile.picksMade} picks ·{" "}
+                </>
+              )}
+              {profile.exactScores} exact · {profile.correctResults} correct
+              results
               {profile.perfectDays > 0 && (
                 <span className="text-mexico font-semibold">
                   {" "}
@@ -229,115 +237,36 @@ export function PlayerProfileClient({ profile }: PlayerProfileClientProps) {
         </div>
       </header>
 
-      {profile.achievements.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="section-title px-0.5">Achievements</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {profile.achievements.map((achievement) => (
-              <article
-                key={achievement.title}
-                className="card p-3 flex items-start gap-2.5"
-              >
-                <span className="text-xl leading-none" aria-hidden>
-                  {achievement.icon}
-                </span>
-                <div className="min-w-0">
-                  <p className="font-bold text-usa text-sm">{achievement.title}</p>
-                  <p className="text-xs text-ink-muted mt-0.5 leading-snug">
-                    {achievement.detail}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="card p-4 space-y-3">
-        <h2 className="font-bold text-usa">Points breakdown</h2>
-        <div className="space-y-1.5">
-          <PointsStat label="Match picks" value={pb.matchPoints} highlight />
-          {pb.groupStagePoints > 0 && pb.knockoutPoints > 0 && (
-            <>
-              <PointsStat label="Group stage" value={pb.groupStagePoints} />
-              <PointsStat label="Knockout" value={pb.knockoutPoints} />
-            </>
-          )}
-          <PointsStat label="Hard pick bonuses" value={pb.hardPickBonusPoints} />
-          <PointsStat label="Fire bonuses" value={pb.fireBonusPoints} />
-          <PointsStat label="Miracle bonuses" value={pb.miraclePoints} />
-          <PointsStat label="Tournament podium picks" value={pb.tournamentPickPoints} />
-          {pb.championPickPoints > 0 && (
-            <PointsStat label="Champion pick" value={pb.championPickPoints} />
-          )}
-          {pb.runnerUpPickPoints > 0 && (
-            <PointsStat label="Runner-up pick" value={pb.runnerUpPickPoints} />
-          )}
-          {pb.thirdPlacePickPoints > 0 && (
-            <PointsStat label="Third place pick" value={pb.thirdPlacePickPoints} />
-          )}
-          <PointsStat label="Finals challenge" value={pb.finalsChallengePoints} />
-          <PointsStat label="Manual adjustments" value={pb.manualAdjustments} />
-        </div>
-        <div className="border-t border-ink/5 pt-2 flex items-center justify-between">
-          <span className="font-bold text-usa">Total</span>
-          <span className="text-lg font-extrabold text-mexico tabular-nums">
-            {displayTotal} pts
-          </span>
-        </div>
-      </section>
+      <AchievementShowcase achievements={profile.achievements} />
 
       {profile.podiumPicks && (
-        <section className="card p-4 space-y-3">
-          <h2 className="font-bold text-usa">Tournament podium picks</h2>
-          <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                ["Champion", profile.podiumPicks.first, pb.championPickPoints],
-                ["Runner-up", profile.podiumPicks.second, pb.runnerUpPickPoints],
-                ["Third", profile.podiumPicks.third, pb.thirdPlacePickPoints],
-              ] as const
-            ).map(([label, team, pts]) => (
-              <div
-                key={label}
-                className="rounded-lg bg-ink/[0.03] p-2.5 text-center space-y-1"
-              >
-                <p className="text-[10px] font-bold uppercase tracking-wide text-ink-faint">
-                  {label}
-                </p>
-                {team ? (
-                  <>
-                    <Flag fifaCode={team.fifa_code} size="md" className="mx-auto" />
-                    <p className="text-xs font-semibold text-usa leading-tight">
-                      {team.short_name}
-                    </p>
-                    {pts > 0 && (
-                      <p className="text-[10px] font-bold text-mexico">+{pts} pts</p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-ink-faint">—</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+        <ProfilePodiumShowcase
+          podiumPicks={profile.podiumPicks}
+          championPoints={pb.championPickPoints}
+          runnerUpPoints={pb.runnerUpPickPoints}
+          thirdPoints={pb.thirdPlacePickPoints}
+          playerName={profile.displayName.split(" ")[0] ?? profile.displayName}
+          isOwnProfile={isOwnProfile}
+        />
       )}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-2 px-0.5">
           <h2 className="section-title">Pick history</h2>
-          <span className="text-xs text-ink-faint tabular-nums">
-            {filteredPicks.length} picks
-          </span>
+          {isOwnProfile && (
+            <span className="text-xs text-ink-faint tabular-nums">
+              {filteredPicks.length} picks
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {(
             [
               ["all", "All"],
-              ["scored", "Scored"],
-              ["upcoming", "Upcoming"],
+              ["exact", "Exact"],
+              ["correct", "Correct"],
+              ["miss", "Miss"],
             ] as const
           ).map(([key, label]) => (
             <button

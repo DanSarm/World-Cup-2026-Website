@@ -13,6 +13,7 @@ import { HomePodiumSection } from "@/components/HomePodiumSection";
 import { HomeTopFive } from "@/components/HomeTopFive";
 import { findCurrentlyPlayingMatches, isAnyMatchInPlayWindow, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
 import { syncLiveScores } from "@/lib/scores/sync";
+import { filterCommunityPicksForViewer } from "@/lib/pickVisibility";
 
 export default async function HomePage() {
   const session = await getSession();
@@ -64,6 +65,9 @@ export default async function HomePage() {
       matchIdsToLoad.map(async (id) => [id, await getConfirmedMatchPicks(id)] as const)
     )
   );
+  const communityPickCountsByMatchId = Object.fromEntries(
+    [...communityPicksByMatchId.entries()].map(([id, picks]) => [id, picks.length])
+  );
 
   const totalPlayers = players.length;
   const missingKickoffs = matches.some((m) => !m.kickoff_at);
@@ -96,11 +100,16 @@ export default async function HomePage() {
           key={match.id}
           match={match}
           prediction={predMap.get(match.id)}
-          picks={communityPicksByMatchId.get(match.id) ?? []}
+          picks={filterCommunityPicksForViewer(
+            communityPicksByMatchId.get(match.id) ?? [],
+            match,
+            session.id
+          )}
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
           sectionLabel="Live now"
           totalPlayers={totalPlayers}
+          predictedCount={communityPickCountsByMatchId[match.id]}
         />
       ))}
 
@@ -109,11 +118,16 @@ export default async function HomePage() {
           key={match.id}
           match={match}
           prediction={predMap.get(match.id)}
-          picks={communityPicksByMatchId.get(match.id) ?? []}
+          picks={filterCommunityPicksForViewer(
+            communityPicksByMatchId.get(match.id) ?? [],
+            match,
+            session.id
+          )}
           currentPlayerId={session.id}
           scoringConfig={scoringConfig}
           sectionLabel="Next game"
           totalPlayers={totalPlayers}
+          predictedCount={communityPickCountsByMatchId[match.id]}
         />
       ))}
 

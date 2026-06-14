@@ -8,9 +8,11 @@ import { MatchCard } from "./MatchCard";
 import { MatchCommunityPicks } from "./MatchCommunityPicks";
 import {
   hasDisplayableLiveScore,
+  isMatchDecidedForScoring,
   isMatchInPlayWindow,
   isMatchLive,
 } from "@/lib/matchLive";
+import { canRevealOtherPlayersPicks } from "@/lib/pickVisibility";
 
 interface PicksMatchCardProps {
   match: Match;
@@ -19,6 +21,7 @@ interface PicksMatchCardProps {
   currentPlayerId: string;
   scoringConfig: ScoringConfig;
   totalPlayers: number;
+  predictedCount?: number;
   onPickSaved?: () => void;
 }
 
@@ -56,14 +59,17 @@ export function PicksMatchCard({
   currentPlayerId,
   scoringConfig,
   totalPlayers,
+  predictedCount,
   onPickSaved,
 }: PicksMatchCardProps) {
   const showingLiveScore = hasDisplayableLiveScore(match);
   const isLive = isMatchLive(match);
+  const matchDecided = isMatchDecidedForScoring(match);
+  const picksRevealed = canRevealOtherPlayersPicks(match);
   const mostPickedScore = useMemo(() => {
-    if (showingLiveScore || isLive) return null;
+    if (!picksRevealed || showingLiveScore || isLive || matchDecided) return null;
     return mostPickedFromCommunityPicks(picks);
-  }, [picks, showingLiveScore, isLive]);
+  }, [picks, picksRevealed, showingLiveScore, isLive, matchDecided]);
 
   return (
     <div className="card p-0 overflow-hidden h-fit w-full">
@@ -84,8 +90,9 @@ export function PicksMatchCard({
         currentPlayerId={currentPlayerId}
         scoringConfig={scoringConfig}
         embedded
-        showLivePoints={showingLiveScore || isLive}
+        showLivePoints={showingLiveScore || isLive || matchDecided}
         totalPlayers={totalPlayers}
+        predictedCount={predictedCount}
       />
     </div>
   );

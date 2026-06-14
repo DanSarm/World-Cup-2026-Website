@@ -112,9 +112,32 @@ const form = buildPlayerRecentForm(
 );
 
 assert(form.length === 10, "returns ten slots");
-assert(form[9] === "correct", "rightmost is latest match (draw, not exact)");
+assert(form[9] === "correct", "rightmost is latest match by kickoff (draw, not exact)");
 assert(form[4] === "exact", "fifth slot is oldest of last six picks");
 assert(form[0] === null, "pads early slots when fewer than ten results");
+
+const outOfOrderKickoff: Match[] = [
+  { ...matchBase, id: "early-num", match_number: 10, kickoff_at: "2026-06-10T18:00:00Z", home_score: 1, away_score: 0 },
+  { ...matchBase, id: "late-num", match_number: 5, kickoff_at: "2026-06-15T18:00:00Z", home_score: 2, away_score: 2 },
+];
+
+const outOfOrderPreds: MatchPrediction[] = [
+  pred("early-num", 1, 0),
+  pred("late-num", 2, 2),
+];
+
+const chronologicalForm = buildPlayerRecentForm(
+  "player-1",
+  outOfOrderKickoff,
+  outOfOrderPreds,
+  DEFAULT_SCORING_CONFIG,
+  2
+);
+
+assert(
+  chronologicalForm[1] === "exact" && chronologicalForm[0] === "exact",
+  "orders by kickoff_at, not match_number"
+);
 
 const formFive = buildPlayerRecentForm(
   "player-1",
@@ -124,6 +147,46 @@ const formFive = buildPlayerRecentForm(
   5
 );
 assert(formFive.length === 5, "count override still works");
+
+const sevenFinals: Match[] = [
+  { ...matchBase, id: "f1", match_number: 1, kickoff_at: "2026-06-11T18:00:00Z", home_score: 2, away_score: 0 },
+  { ...matchBase, id: "f2", match_number: 2, kickoff_at: "2026-06-12T18:00:00Z", home_score: 0, away_score: 0 },
+  { ...matchBase, id: "f3", match_number: 3, kickoff_at: "2026-06-13T18:00:00Z", home_score: 1, away_score: 1 },
+  { ...matchBase, id: "f4", match_number: 4, kickoff_at: "2026-06-14T18:00:00Z", home_score: 3, away_score: 2 },
+  { ...matchBase, id: "f5", match_number: 5, kickoff_at: "2026-06-15T18:00:00Z", home_score: 0, away_score: 1 },
+  { ...matchBase, id: "f6", match_number: 6, kickoff_at: "2026-06-16T18:00:00Z", home_score: 2, away_score: 2 },
+  { ...matchBase, id: "f7", match_number: 7, kickoff_at: "2026-06-17T18:00:00Z", home_score: 1, away_score: 0 },
+];
+
+const sixPicksOnly: MatchPrediction[] = [
+  pred("f1", 2, 0),
+  pred("f2", 0, 0),
+  pred("f3", 0, 0),
+  pred("f4", 2, 1),
+  pred("f5", 0, 0),
+  pred("f6", 1, 1),
+  // f7: no pick — treated as 0-0 for form dots only
+];
+
+const sevenSlotForm = buildPlayerRecentForm(
+  "player-1",
+  sevenFinals,
+  sixPicksOnly,
+  DEFAULT_SCORING_CONFIG
+);
+
+assert(
+  sevenSlotForm.filter((slot) => slot != null).length === 7,
+  "shows a dot for every finished match"
+);
+assert(
+  sevenSlotForm[9] === "wrong",
+  "missing pick on f7 (1-0 final) counts as 0-0 wrong"
+);
+assert(
+  sevenSlotForm[4] === "exact",
+  "f2 0-0 pick on 0-0 final is exact"
+);
 
 const liveMatch: Match = {
   ...matchBase,

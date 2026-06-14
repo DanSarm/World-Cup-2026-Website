@@ -17,6 +17,7 @@ export interface PicksSnapshotPayload {
   matches: Match[];
   predictions: MatchPrediction[];
   communityPicksByMatchId: Record<string, CommunityMatchPick[]>;
+  communityPickCountsByMatchId: Record<string, number>;
   totalPlayers: number;
   hasLiveScoring: boolean;
 }
