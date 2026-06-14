@@ -525,16 +525,7 @@ export async function getLiveSnapshot() {
 }
 
 export async function getPicksSnapshot(playerId: string) {
-  let matches = await getMatchesWithTeams();
-  let liveClockByMatchId: Record<string, string> | undefined;
-  if (isAnyMatchNeedingScoreSync(matches)) {
-    const { syncLiveScores } = await import("./scores/sync");
-    const sync = await syncLiveScores(true);
-    liveClockByMatchId = sync.liveClockByMatchId;
-    matches = await getMatchesWithTeams();
-  }
-
-  matches = mergeLiveClocks(matches, liveClockByMatchId);
+  const matches = mergeLiveClocks(await getMatchesWithTeams(), undefined);
   const pickMatches = resolveMatchesForPicks(matches);
   const matchIds = pickMatches.map((m) => m.id);
 

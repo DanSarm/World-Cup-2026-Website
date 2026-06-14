@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LeaderboardEntry, Match, PickFormSlot } from "@/lib/types";
-import { assignCompetitionRanksImmutable } from "@/lib/competitionRank";
 
 const POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_LIVE_POLL_INTERVAL_MS ?? "10000"
@@ -126,7 +125,7 @@ export function mergeLeaderboard(
   if (!live?.length) return base.map((entry) => ({ ...entry }));
 
   const byId = new Map(live.map((e) => [e.playerId, e]));
-  const merged = base.map((entry) => {
+  return base.map((entry) => {
     const updated = byId.get(entry.playerId);
     if (!updated) return { ...entry };
     return {
@@ -141,14 +140,4 @@ export function mergeLeaderboard(
         | undefined,
     };
   });
-
-  const sorted = [...merged].sort((a, b) => {
-    const aPts = a.provisionalTotalPoints ?? a.totalPoints;
-    const bPts = b.provisionalTotalPoints ?? b.totalPoints;
-    return bPts - aPts || a.displayName.localeCompare(b.displayName);
-  });
-  return assignCompetitionRanksImmutable(
-    sorted,
-    (e) => e.provisionalTotalPoints ?? e.totalPoints
-  );
 }
