@@ -465,7 +465,7 @@ export async function adminSaveMatchResultAction(formData: FormData) {
     })
     .eq("id", matchId);
 
-  await recalculateAllScores();
+  await recalculateAllScores({ notifyFinalizedMatchIds: [matchId] });
   await logAudit(admin.id, "save_match_result", { matchId });
   revalidatePath("/admin");
   revalidatePath("/picks");

@@ -1,0 +1,2 @@
+export const PICK_REMINDER_MINUTES = 15;
+export const PICK_REMINDER_WINDOW_MINUTES = 4;

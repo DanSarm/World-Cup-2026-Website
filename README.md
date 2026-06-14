@@ -42,6 +42,9 @@ Fill in `.env.local`:
 | `LIVE_SCORES_MAX_SYNCS_PER_DAY` | Cap on scores API calls per day (default: 8) |
 | `LIVE_SCORES_MIN_INTERVAL_MS` | Min ms between score syncs (default: 600000 = 10 min) |
 | `CRON_SECRET` | Protects optional cron routes (not required for live scores) |
+| `VAPID_PUBLIC_KEY` | Web Push public key (see pick reminders below) |
+| `VAPID_PRIVATE_KEY` | Web Push private key (server only) |
+| `VAPID_SUBJECT` | Contact for push service, e.g. `mailto:you@example.com` |
 
 ### 4. Seed match fixtures
 
@@ -100,6 +103,44 @@ Live scores **do not** run on a Vercel cron. Pages poll only while a match may b
 4. Leave **Output Directory** empty (do not set `.next` manually)
 5. Add all env vars from `.env.local` in Vercel project settings
 6. Deploy with **Discard build cache** if a prior deploy showed middleware or 404 errors
+
+### 8. Notifications (free, no cron service)
+
+Push notifications use **Web Push** (free) — no Firebase, OneSignal, or paid cron.
+
+**What you get automatically:**
+
+| Alert | When it fires |
+|---|---|
+| Pick reminder | ~15 min before kickoff if you have no pick |
+| Exact score | Your pick matched the final score |
+| Correct result | Right winner/draw, not exact |
+| Fire bonus | Exact-score fire bonus earned |
+| Big points | 15+ pts on one match |
+| Rank up | You moved up after a result |
+| Top 3 | You entered the top 3 |
+| Live exact | Live score currently matches your pick |
+
+**Setup:**
+
+1. Run both SQL migrations in Supabase:
+   ```
+   supabase/migrations/add_push_notifications.sql
+   supabase/migrations/add_notifications_sent.sql
+   ```
+   Or: `npm run migrate:push-notifications`
+
+2. Generate VAPID keys:
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   Add to `.env.local` and Vercel: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:you@example.com`
+
+3. Deploy — **no external cron needed.** Score alerts fire when ESPN syncs or admin saves a result. Pick reminders use your phone/browser timers when you visit the app, plus background push when anyone has the site open.
+
+4. Tap **Enable notifications** in the app banner.
+
+**iPhone:** Add the site to Home Screen first (iOS 16.4+), then enable notifications.
 
 ## Scripts
 

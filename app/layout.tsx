@@ -2,6 +2,7 @@ import { Archivo, Saira_Condensed } from "next/font/google";
 import { getSession } from "@/lib/session";
 import { Nav } from "@/components/Nav";
 import { BottomNav } from "@/components/BottomNav";
+import { NotificationProvider } from "@/components/NotificationProvider";
 import { RulesModal } from "@/components/RulesModal";
 import { FlagMarquee } from "@/components/FlagMarquee";
 import "./globals.css";
@@ -24,6 +25,12 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Family Cup 2026",
   description: "Private friends & family World Cup prediction pool",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent" as const,
+    title: "Family Cup 2026",
+  },
 };
 
 export default async function RootLayout({
@@ -44,6 +51,9 @@ export default async function RootLayout({
             </div>
           </div>
           <main className="flex-1 w-full px-4 py-6 md:py-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-10">
+            <div className="max-w-2xl mx-auto">
+              <NotificationProvider enabled={Boolean(session)} />
+            </div>
             {children}
           </main>
           <BottomNav isAdmin={session?.is_admin} />

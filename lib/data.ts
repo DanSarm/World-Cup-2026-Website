@@ -16,6 +16,11 @@ import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { filterCommunityPicksByMatchForViewer } from "./pickVisibility";
 import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync } from "./matchLive";
+import {
+  findLatestDecidedMatch,
+  rankMovementFromRanks,
+  revertMatchForScoring,
+} from "./rankMovement";
 import { mergeLiveClocks } from "./liveClock";
 import { matchDateKey } from "./utils";
 import { resolveMatchesForPicks } from "./resolvedMatches";
@@ -310,9 +315,8 @@ export async function getActualResults(): Promise<ActualTournamentResults> {
 }
 
 /**
- * Rank movement = current rank vs the leaderboard as it stood before the
- * most recent day (ET) with final results. Those matches are reverted to
- * "scheduled" and the board re-ranked to get the previous order.
+ * Rank movement = current rank vs the board immediately before the most
+ * recently played match had its result applied.
  */
 function attachRankMovement(
   current: LeaderboardEntry[],
@@ -326,28 +330,32 @@ function attachRankMovement(
   actualResults: ActualTournamentResults,
   teams: Team[]
 ): LeaderboardEntry[] {
-  const finalDates = matches
-    .filter((m) => m.status === "final" && m.kickoff_at)
-    .map((m) => matchDateKey(m.kickoff_at));
-  const latestFinalDate = finalDates.sort().pop();
-
-  if (!latestFinalDate) {
+  const latestMatch = findLatestDecidedMatch(matches);
+  if (!latestMatch) {
     return current.map((e) => ({ ...e, rankMovement: "same" as const }));
   }
 
   const priorMatches = matches.map((m) =>
-    m.status === "final" && matchDateKey(m.kickoff_at) === latestFinalDate
-      ? {
-          ...m,
-          status: "scheduled" as const,
-          home_score: null,
-          away_score: null,
-          winner_team_id: null,
-        }
-      : m
+    m.id === latestMatch.id ? revertMatchForScoring(m) : m
   );
 
-  const previous = calculateLeaderboard(
+  const scoringOpts = { includeLiveScores: false };
+  const projectedPrizes = new Map<string, number>();
+
+  const afterBoard = calculateLeaderboard(
+    players,
+    matches,
+    predictions,
+    podiumPredictions,
+    finalsPredictions,
+    adjustments,
+    settings,
+    actualResults,
+    projectedPrizes,
+    teams,
+    scoringOpts
+  );
+  const beforeBoard = calculateLeaderboard(
     players,
     priorMatches,
     predictions,
@@ -356,19 +364,21 @@ function attachRankMovement(
     adjustments,
     settings,
     actualResults,
-    new Map(),
-    teams
+    projectedPrizes,
+    teams,
+    scoringOpts
   );
-  const prevRankByPlayer = new Map(previous.map((e) => [e.playerId, e.rank]));
+
+  const afterRankByPlayer = new Map(afterBoard.map((e) => [e.playerId, e.rank]));
+  const beforeRankByPlayer = new Map(
+    beforeBoard.map((e) => [e.playerId, e.rank])
+  );
 
   return current.map((entry) => {
-    const prevRank = prevRankByPlayer.get(entry.playerId);
-    const rankMovement =
-      prevRank == null || prevRank === entry.rank
-        ? ("same" as const)
-        : prevRank > entry.rank
-          ? ("up" as const)
-          : ("down" as const);
+    const rankMovement = rankMovementFromRanks(
+      beforeRankByPlayer.get(entry.playerId),
+      afterRankByPlayer.get(entry.playerId)
+    );
     return { ...entry, rankMovement };
   });
 }
@@ -557,7 +567,10 @@ export async function getPicksSnapshot(playerId: string) {
   };
 }
 
-export async function recalculateAllScores(): Promise<void> {
+export async function recalculateAllScores(options?: {
+  notifyFinalizedMatchIds?: string[];
+  notifyUpdatedMatchIds?: string[];
+}): Promise<void> {
   const supabase = getSupabase();
   const [matches, , podiumPredictions, finalsPredictions, actualResults, settings, players, teams] =
     await Promise.all([
@@ -624,6 +637,17 @@ export async function recalculateAllScores(): Promise<void> {
       .from("finals_challenge_predictions")
       .update({ points, updated_at: new Date().toISOString() })
       .eq("id", fp.id);
+  }
+
+  if (
+    options?.notifyFinalizedMatchIds?.length ||
+    options?.notifyUpdatedMatchIds?.length
+  ) {
+    const { fireScoreNotifications } = await import("./notifications/scoreEvents");
+    fireScoreNotifications({
+      finalizedMatchIds: options.notifyFinalizedMatchIds ?? [],
+      updatedMatchIds: options.notifyUpdatedMatchIds ?? [],
+    });
   }
 }
 

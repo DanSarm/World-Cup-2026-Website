@@ -38,6 +38,8 @@ export interface SyncLiveScoresResult {
   updated: number;
   finalized: number;
   liveMatchIds: string[];
+  finalizedMatchIds: string[];
+  updatedMatchIds: string[];
   syncedAt: string;
   quotaCost?: number;
   source?: "espn" | "odds_api" | "none";
@@ -186,6 +188,8 @@ async function syncFromEspn(
   updated: number;
   finalized: number;
   liveMatchIds: string[];
+  finalizedMatchIds: string[];
+  updatedMatchIds: string[];
   needsRecalc: boolean;
   unresolved: Match[];
   liveClockByMatchId: Record<string, string>;
@@ -196,6 +200,8 @@ async function syncFromEspn(
   let updated = 0;
   let finalized = 0;
   const liveMatchIds: string[] = [];
+  const finalizedMatchIds: string[] = [];
+  const updatedMatchIds: string[] = [];
   let needsRecalc = false;
   const unresolved: Match[] = [];
   const liveClockByMatchId: Record<string, string> = {};
@@ -223,14 +229,25 @@ async function syncFromEspn(
 
     if (result === "finalized") {
       finalized++;
+      finalizedMatchIds.push(match.id);
       needsRecalc = true;
     } else if (result === "updated") {
       updated++;
+      updatedMatchIds.push(match.id);
       liveMatchIds.push(match.id);
     }
   }
 
-  return { updated, finalized, liveMatchIds, needsRecalc, unresolved, liveClockByMatchId };
+  return {
+    updated,
+    finalized,
+    liveMatchIds,
+    finalizedMatchIds,
+    updatedMatchIds,
+    needsRecalc,
+    unresolved,
+    liveClockByMatchId,
+  };
 }
 
 async function syncFromOddsApi(
@@ -241,6 +258,8 @@ async function syncFromOddsApi(
   updated: number;
   finalized: number;
   liveMatchIds: string[];
+  finalizedMatchIds: string[];
+  updatedMatchIds: string[];
   needsRecalc: boolean;
   quotaCost: number;
 }> {
@@ -256,6 +275,8 @@ async function syncFromOddsApi(
       updated: 0,
       finalized: 0,
       liveMatchIds: [],
+      finalizedMatchIds: [],
+      updatedMatchIds: [],
       needsRecalc: false,
       quotaCost: 0,
     };
@@ -267,6 +288,8 @@ async function syncFromOddsApi(
       updated: 0,
       finalized: 0,
       liveMatchIds: [],
+      finalizedMatchIds: [],
+      updatedMatchIds: [],
       needsRecalc: false,
       quotaCost: 0,
     };
@@ -283,6 +306,8 @@ async function syncFromOddsApi(
   let updated = 0;
   let finalized = 0;
   const liveMatchIds: string[] = [];
+  const finalizedMatchIds: string[] = [];
+  const updatedMatchIds: string[] = [];
   let needsRecalc = false;
 
   for (const match of matches) {
@@ -304,16 +329,26 @@ async function syncFromOddsApi(
 
     if (result === "finalized") {
       finalized++;
+      finalizedMatchIds.push(match.id);
       needsRecalc = true;
     } else if (result === "updated") {
       updated++;
+      updatedMatchIds.push(match.id);
       liveMatchIds.push(match.id);
     }
   }
 
   await setLastSyncTime(ODDS_LAST_SYNC_KEY, Date.now());
 
-  return { updated, finalized, liveMatchIds, needsRecalc, quotaCost };
+  return {
+    updated,
+    finalized,
+    liveMatchIds,
+    finalizedMatchIds,
+    updatedMatchIds,
+    needsRecalc,
+    quotaCost,
+  };
 }
 
 export async function syncLiveScores(
@@ -340,6 +375,8 @@ export async function syncLiveScores(
       updated: 0,
       finalized: 0,
       liveMatchIds: [],
+      finalizedMatchIds: [],
+      updatedMatchIds: [],
       syncedAt,
       source: "none",
     };
@@ -366,6 +403,8 @@ export async function syncLiveScores(
       updated: 0,
       finalized: 0,
       liveMatchIds: [],
+      finalizedMatchIds: [],
+      updatedMatchIds: [],
       syncedAt: new Date(espnLastSync).toISOString(),
       source: "none",
     };
@@ -374,6 +413,8 @@ export async function syncLiveScores(
   let updated = 0;
   let finalized = 0;
   const liveMatchIds: string[] = [];
+  const finalizedMatchIds: string[] = [];
+  const updatedMatchIds: string[] = [];
   let needsRecalc = false;
   let quotaCost = 0;
   let source: SyncLiveScoresResult["source"] = "espn";
@@ -384,6 +425,8 @@ export async function syncLiveScores(
     updated += espnResult.updated;
     finalized += espnResult.finalized;
     liveMatchIds.push(...espnResult.liveMatchIds);
+    finalizedMatchIds.push(...espnResult.finalizedMatchIds);
+    updatedMatchIds.push(...espnResult.updatedMatchIds);
     needsRecalc ||= espnResult.needsRecalc;
     liveClockByMatchId = espnResult.liveClockByMatchId;
     await setLastSyncTime(ESPN_LAST_SYNC_KEY, Date.now());
@@ -400,6 +443,8 @@ export async function syncLiveScores(
       updated += oddsResult.updated;
       finalized += oddsResult.finalized;
       liveMatchIds.push(...oddsResult.liveMatchIds);
+      finalizedMatchIds.push(...oddsResult.finalizedMatchIds);
+      updatedMatchIds.push(...oddsResult.updatedMatchIds);
       needsRecalc ||= oddsResult.needsRecalc;
       quotaCost += oddsResult.quotaCost;
     }
@@ -415,6 +460,8 @@ export async function syncLiveScores(
       updated = oddsResult.updated;
       finalized = oddsResult.finalized;
       liveMatchIds.push(...oddsResult.liveMatchIds);
+      finalizedMatchIds.push(...oddsResult.finalizedMatchIds);
+      updatedMatchIds.push(...oddsResult.updatedMatchIds);
       needsRecalc = oddsResult.needsRecalc;
       quotaCost = oddsResult.quotaCost;
       source = "odds_api";
@@ -425,6 +472,8 @@ export async function syncLiveScores(
         updated: 0,
         finalized: 0,
         liveMatchIds: [],
+        finalizedMatchIds: [],
+        updatedMatchIds: [],
         syncedAt,
         source: "none",
       };
@@ -432,9 +481,21 @@ export async function syncLiveScores(
   }
 
   const reconcile = await reconcileRecentFinalScores();
+  if (reconcile.corrected > 0) {
+    needsRecalc = true;
+    finalizedMatchIds.push(...reconcile.correctedMatchIds);
+  }
+
   if (needsRecalc || reconcile.needsRecalc) {
     const { recalculateAllScores } = await import("@/lib/data");
     await recalculateAllScores();
+    const { fireScoreNotifications } = await import(
+      "@/lib/notifications/scoreEvents"
+    );
+    fireScoreNotifications({
+      finalizedMatchIds: [...new Set(finalizedMatchIds)],
+      updatedMatchIds: [...new Set(updatedMatchIds)],
+    });
   }
 
   return {
@@ -442,6 +503,8 @@ export async function syncLiveScores(
     updated: updated + reconcile.corrected,
     finalized,
     liveMatchIds: [...new Set(liveMatchIds)],
+    finalizedMatchIds: [...new Set(finalizedMatchIds)],
+    updatedMatchIds: [...new Set(updatedMatchIds)],
     syncedAt,
     quotaCost,
     source,
@@ -453,6 +516,7 @@ const RECONCILE_FINAL_HOURS = 72;
 
 export interface ReconcileFinalScoresResult {
   corrected: number;
+  correctedMatchIds: string[];
   needsRecalc: boolean;
 }
 
@@ -480,7 +544,7 @@ export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScores
   });
 
   if (!matches.length) {
-    return { corrected: 0, needsRecalc: false };
+    return { corrected: 0, correctedMatchIds: [], needsRecalc: false };
   }
 
   const dates = new Set<string>();
@@ -494,6 +558,7 @@ export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScores
   const events = await fetchEspnWorldCupEvents([...dates]);
   let corrected = 0;
   let needsRecalc = false;
+  const correctedMatchIds: string[] = [];
 
   for (const match of matches) {
     const event = matchEspnEventToFixture(events, match);
@@ -533,8 +598,9 @@ export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScores
       `Reconciled match ${match.match_number}: ${match.home_score}-${match.away_score} -> ${event.homeScore}-${event.awayScore}`
     );
     corrected++;
+    correctedMatchIds.push(match.id);
     needsRecalc = true;
   }
 
-  return { corrected, needsRecalc };
+  return { corrected, correctedMatchIds, needsRecalc };
 }

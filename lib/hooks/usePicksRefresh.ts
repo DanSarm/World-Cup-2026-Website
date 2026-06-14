@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CommunityMatchPick } from "@/lib/data";
 import { isAnyMatchNeedingScoreSync } from "@/lib/matchLive";
+import type { PickReminderPayload, PickScheduleItem } from "@/lib/pickReminders";
 import type { Match, MatchPrediction } from "@/lib/types";
 
 const LIVE_POLL_INTERVAL_MS = Number(
@@ -20,6 +21,8 @@ export interface PicksSnapshotPayload {
   communityPickCountsByMatchId: Record<string, number>;
   totalPlayers: number;
   hasLiveScoring: boolean;
+  pickReminder?: PickReminderPayload | null;
+  pickSchedules?: PickScheduleItem[];
 }
 
 export function usePicksRefresh(enabled = true) {

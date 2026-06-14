@@ -7,12 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/odds/polymarketChampionOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts && tsx lib/scores/espnScores.test.ts && tsx lib/defaultPredictions.test.ts && tsx lib/predictionGuard.test.ts && tsx lib/playerNames.test.ts && tsx lib/recentPickForm.test.ts",
+    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/odds/polymarketChampionOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts && tsx lib/scores/espnScores.test.ts && tsx lib/defaultPredictions.test.ts && tsx lib/predictionGuard.test.ts && tsx lib/playerNames.test.ts && tsx lib/recentPickForm.test.ts && tsx lib/pickReminders.test.ts && tsx lib/notifications/builders.test.ts",
     "seed": "tsx scripts/seed.ts",
     "migrate:pick-confirmed": "tsx scripts/migrate-pick-confirmed.ts",
     "backup:predictions": "tsx scripts/backup-predictions.ts",
     "sync:champion-odds": "tsx scripts/sync-champion-odds.ts",
     "migrate:prediction-safeguards": "tsx scripts/apply-prediction-safeguards-migration.ts",
+    "migrate:push-notifications": "tsx scripts/apply-push-notifications-migration.ts",
     "restore:predictions": "tsx scripts/restore-predictions.ts",
     "merge:predictions-from-backup": "tsx scripts/merge-predictions-from-backup.ts",
     "recalculate:scores": "tsx scripts/recalculate-scores.ts"
@@ -27,6 +28,7 @@
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "web-push": "^3.6.7",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -37,6 +39,7 @@
     "@types/node": "^20.17.24",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "@types/web-push": "^3.6.4",
     "dotenv": "^17.4.2",
     "eslint": "^9.22.0",
     "eslint-config-next": "^15.2.4",

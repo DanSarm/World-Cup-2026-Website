@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getLiveSnapshot } from "@/lib/data";
+import { firePickReminders } from "@/lib/pickReminders";
 import {
   findLiveMatch,
   findCurrentlyPlayingMatches,
@@ -16,6 +17,7 @@ export async function GET() {
   }
 
   try {
+    firePickReminders();
     const snapshot = await getLiveSnapshot();
     const liveMatch = snapshot.liveMatch;
 

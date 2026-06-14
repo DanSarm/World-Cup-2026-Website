@@ -1,0 +1,17 @@
+{
+  "name": "Family Cup 2026",
+  "short_name": "Family Cup",
+  "description": "Private World Cup prediction pool",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#002868",
+  "icons": [
+    {
+      "src": "/logo/clipart1360288.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
