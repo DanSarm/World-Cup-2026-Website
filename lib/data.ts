@@ -15,7 +15,7 @@ import { getEffectiveMatchPrediction, isConfirmedPick } from "./pickUtils";
 import { resolvePlayerPodium } from "./podiumDisplay";
 import { buildRecentFormByPlayer } from "./recentPickForm";
 import { filterCommunityPicksByMatchForViewer } from "./pickVisibility";
-import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchInPlayWindow } from "./matchLive";
+import { findLiveMatch, hasAnyDisplayableLiveScore, shouldAutoFinalizeMatch, isMatchDecidedForScoring, isAnyMatchNeedingScoreSync } from "./matchLive";
 import { mergeLiveClocks } from "./liveClock";
 import { matchDateKey } from "./utils";
 import { resolveMatchesForPicks } from "./resolvedMatches";
@@ -400,6 +400,13 @@ export async function getLeaderboardData(options?: {
 }> {
   const includeLiveScores = options?.includeLiveScores ?? false;
   let matches = await getMatchesWithTeams();
+
+  if (isAnyMatchNeedingScoreSync(matches) || matches.some(shouldAutoFinalizeMatch)) {
+    const { syncLiveScores } = await import("./scores/sync");
+    await syncLiveScores(true);
+    matches = await getMatchesWithTeams();
+  }
+
   if (await finalizeCompletedMatches(matches)) {
     matches = await getMatchesWithTeams();
   }
@@ -504,7 +511,7 @@ export async function getLeaderboardData(options?: {
 
 export async function getLiveSnapshot() {
   const { syncLiveScores } = await import("./scores/sync");
-  const sync = await syncLiveScores();
+  const sync = await syncLiveScores(true);
   const snapshot = await getLeaderboardData({ includeLiveScores: true });
   const matches = mergeLiveClocks(snapshot.matches, sync.liveClockByMatchId);
   const liveMatch = findLiveMatch(matches);
@@ -514,9 +521,9 @@ export async function getLiveSnapshot() {
 export async function getPicksSnapshot(playerId: string) {
   let matches = await getMatchesWithTeams();
   let liveClockByMatchId: Record<string, string> | undefined;
-  if (isAnyMatchInPlayWindow(matches)) {
+  if (isAnyMatchNeedingScoreSync(matches)) {
     const { syncLiveScores } = await import("./scores/sync");
-    const sync = await syncLiveScores();
+    const sync = await syncLiveScores(true);
     liveClockByMatchId = sync.liveClockByMatchId;
     matches = await getMatchesWithTeams();
   }

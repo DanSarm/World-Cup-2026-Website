@@ -1,7 +1,7 @@
 import { addDays, format, parseISO } from "date-fns";
 import type { Match } from "@/lib/types";
 import { teamNameMatches } from "@/lib/odds/teamAliases";
-import { isMatchInPlayWindow } from "@/lib/matchLive";
+import { matchNeedsScoreSync } from "@/lib/matchLive";
 import { formatEspnLiveClock } from "@/lib/liveClock";
 
 const ESPN_WC_SCOREBOARD =
@@ -81,7 +81,7 @@ export function scoreboardDatesForMatches(matches: Match[]): string[] {
 
   for (const match of matches) {
     if (!match.kickoff_at) continue;
-    const inWindow = isMatchInPlayWindow(match);
+    const inWindow = matchNeedsScoreSync(match);
     const kickoff = parseISO(match.kickoff_at);
     const recentlyEnded =
       match.status !== "final" &&

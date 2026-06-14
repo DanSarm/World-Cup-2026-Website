@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CommunityMatchPick } from "@/lib/data";
-import { isAnyMatchInPlayWindow } from "@/lib/matchLive";
+import { isAnyMatchNeedingScoreSync } from "@/lib/matchLive";
 import type { Match, MatchPrediction } from "@/lib/types";
 
 const LIVE_POLL_INTERVAL_MS = Number(
@@ -42,7 +42,7 @@ export function usePicksRefresh(enabled = true) {
     }
   }, [enabled]);
 
-  const liveActive = data ? isAnyMatchInPlayWindow(data.matches) : true;
+  const liveActive = data ? isAnyMatchNeedingScoreSync(data.matches) : true;
   const pollIntervalMs = liveActive ? LIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
 
   useEffect(() => {

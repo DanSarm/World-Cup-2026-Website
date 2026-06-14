@@ -64,6 +64,35 @@ export function isMatchInPlayWindow(match: LiveScoreFields): boolean {
   return now >= kickoff && now <= end;
 }
 
+/** Hours after kickoff to keep polling external score APIs (covers late sync + FT). */
+export const SCORE_SYNC_HOURS = 6;
+
+/** Non-final match that should still receive ESPN / Odds API score updates. */
+export function matchNeedsScoreSync(
+  match: Pick<
+    Match,
+    "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
+  >
+): boolean {
+  if (match.status === "final") return false;
+  if (!match.kickoff_at || !match.home_team_id) return false;
+  if (match.status === "live") return true;
+  if (isMatchInPlayWindow(match)) return true;
+
+  const kickoff = parseISO(match.kickoff_at).getTime();
+  const now = Date.now();
+  return now >= kickoff && now - kickoff <= SCORE_SYNC_HOURS * 60 * 60 * 1000;
+}
+
+export function isAnyMatchNeedingScoreSync(
+  matches: Pick<
+    Match,
+    "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
+  >[]
+): boolean {
+  return matches.some(matchNeedsScoreSync);
+}
+
 /**
  * Match has a result we should score as final — includes API "locked" rows
  * after the in-play window when scores are set (common when sync missed finalize).
@@ -95,7 +124,7 @@ export function isAnyMatchInPlayWindow(matches: Match[]): boolean {
 
 /** Only call The Odds API scores when a game may actually be live. */
 export function shouldSyncLiveScoresFromApi(matches: Match[]): boolean {
-  return isAnyMatchInPlayWindow(matches);
+  return isAnyMatchNeedingScoreSync(matches);
 }
 
 /** Apply live score/status updates onto a full match list. */

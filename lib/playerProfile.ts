@@ -24,7 +24,7 @@ import {
   hasDisplayableLiveScore,
   isMatchDecidedForScoring,
   isMatchInPlayWindow,
-  isAnyMatchInPlayWindow,
+  isAnyMatchNeedingScoreSync,
 } from "./matchLive";
 import type {
   LeaderboardEntry,
@@ -498,8 +498,8 @@ export async function getPlayerProfileData(
   if (!player) return null;
 
   let matches = await getMatchesWithTeams();
-  if (isAnyMatchInPlayWindow(matches)) {
-    await syncLiveScores();
+  if (isAnyMatchNeedingScoreSync(matches)) {
+    await syncLiveScores(true);
   }
 
   const [
@@ -513,7 +513,7 @@ export async function getPlayerProfileData(
     settings,
     teams,
   ] = await Promise.all([
-    getLeaderboardData({ includeLiveScores: isAnyMatchInPlayWindow(matches) }),
+    getLeaderboardData({ includeLiveScores: isAnyMatchNeedingScoreSync(matches) }),
     getPredictions(playerId),
     getPredictions(),
     getTournamentPodiumPredictions(),

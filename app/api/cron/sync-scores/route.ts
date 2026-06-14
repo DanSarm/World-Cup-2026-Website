@@ -4,9 +4,10 @@ import { syncLiveScores } from "@/lib/scores/sync";
 import { revalidatePath } from "next/cache";
 
 async function runSync() {
-  const result = await syncLiveScores(false);
+  const result = await syncLiveScores(true);
   revalidatePath("/");
   revalidatePath("/leaderboard");
+  revalidatePath("/picks");
   return result;
 }
 

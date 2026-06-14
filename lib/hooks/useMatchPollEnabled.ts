@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import type { Match } from "@/lib/types";
-import { isAnyMatchInPlayWindow, isMatchInPlayWindow, isMatchLive } from "@/lib/matchLive";
+import { matchNeedsScoreSync } from "@/lib/matchLive";
 
 /** Re-check every 15s so polling starts when kickoff passes without a page reload. */
 const RECHECK_MS = 15_000;
 
-function matchMayNeedLivePoll(match: Pick<Match, "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id">): boolean {
-  return isMatchLive(match) || isMatchInPlayWindow(match);
+function matchMayNeedLivePoll(
+  match: Pick<Match, "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id">
+): boolean {
+  return matchNeedsScoreSync(match);
 }
 
 /** True when any match may be live — for leaderboard / home polling. */

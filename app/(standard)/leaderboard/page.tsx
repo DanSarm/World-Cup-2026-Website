@@ -15,7 +15,7 @@ import { calculatePrizePool } from "@/lib/payouts";
 import { LeaderboardClient } from "@/components/LeaderboardClient";
 import {
   findCurrentlyPlayingMatches,
-  isAnyMatchInPlayWindow,
+  isAnyMatchNeedingScoreSync,
   hasAnyDisplayableLiveScore,
 } from "@/lib/matchLive";
 import { syncLiveScores } from "@/lib/scores/sync";
@@ -26,8 +26,8 @@ export default async function LeaderboardPage() {
 
   const matchesRaw = await getMatchesWithTeams();
   const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (isAnyMatchInPlayWindow(matchesRaw)) {
-    await syncLiveScores();
+  if (isAnyMatchNeedingScoreSync(matchesRaw)) {
+    await syncLiveScores(true);
   }
 
   const [
@@ -71,7 +71,7 @@ export default async function LeaderboardPage() {
       leaderboard={leaderboard}
       prizePool={prizePool}
       poolHighlights={poolHighlights}
-      pollLive={isAnyMatchInPlayWindow(matches)}
+      pollLive={isAnyMatchNeedingScoreSync(matches)}
       initialHasLiveScoring={hasAnyDisplayableLiveScore(matches)}
     />
   );

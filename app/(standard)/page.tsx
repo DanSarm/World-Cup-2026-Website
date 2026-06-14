@@ -11,7 +11,7 @@ import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
 import { HomeFeaturedMatchSection } from "@/components/HomeFeaturedMatchSection";
 import { HomePodiumSection } from "@/components/HomePodiumSection";
 import { HomeTopFive } from "@/components/HomeTopFive";
-import { findCurrentlyPlayingMatches, isAnyMatchInPlayWindow, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
+import { findCurrentlyPlayingMatches, isAnyMatchNeedingScoreSync, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
 import { syncLiveScores } from "@/lib/scores/sync";
 import { filterCommunityPicksForViewer } from "@/lib/pickVisibility";
 
@@ -30,8 +30,8 @@ export default async function HomePage() {
   ]);
 
   const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (isAnyMatchInPlayWindow(matchesRaw)) {
-    await syncLiveScores();
+  if (isAnyMatchNeedingScoreSync(matchesRaw)) {
+    await syncLiveScores(true);
   }
   const matches =
     liveMatchesInitial.length > 0 ? await getMatchesWithTeams() : matchesRaw;

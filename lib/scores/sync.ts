@@ -9,10 +9,12 @@ import {
   recordOddsApiUsage,
   shouldIncludeRecentCompletedScores,
 } from "@/lib/odds/quotaGuard";
-import { parseISO } from "date-fns";
+import { parseISO, format, addDays } from "date-fns";
 import {
   shouldSyncLiveScoresFromApi,
   isMatchInPlayWindow,
+  matchNeedsScoreSync,
+  shouldAutoFinalizeMatch,
 } from "@/lib/matchLive";
 import {
   fetchLiveScores,
@@ -115,16 +117,6 @@ function shouldSyncScores(matches: Match[]): boolean {
     return now >= kickoff && now - kickoff <= sixHoursMs;
   });
 }
-function matchNeedsExternalScore(match: Match): boolean {
-  if (match.status === "final") return false;
-  if (!match.kickoff_at || !match.home_team_id) return false;
-  if (match.status === "live") return true;
-  if (isMatchInPlayWindow(match)) return true;
-
-  const kickoff = parseISO(match.kickoff_at).getTime();
-  const now = Date.now();
-  return now >= kickoff && now - kickoff <= 6 * 60 * 60 * 1000;
-}
 
 async function applyScoreUpdate(
   match: Match,
@@ -209,7 +201,7 @@ async function syncFromEspn(
   const liveClockByMatchId: Record<string, string> = {};
 
   for (const match of matches) {
-    if (!matchNeedsExternalScore(match)) continue;
+    if (!matchNeedsScoreSync(match)) continue;
 
     const event = matchEspnEventToFixture(events, match);
     if (!event) {
@@ -356,8 +348,11 @@ export async function syncLiveScores(
   const espnLastSync = await getLastSyncTime(ESPN_LAST_SYNC_KEY);
   const inPlayNeedsScore = matches.some(
     (m) =>
-      matchNeedsExternalScore(m) &&
-      (m.home_score === null || m.away_score === null)
+      matchNeedsScoreSync(m) &&
+      (m.home_score === null ||
+        m.away_score === null ||
+        shouldAutoFinalizeMatch(m) ||
+        (m.status === "locked" && !isMatchInPlayWindow(m)))
   );
 
   if (
@@ -393,10 +388,8 @@ export async function syncLiveScores(
     liveClockByMatchId = espnResult.liveClockByMatchId;
     await setLastSyncTime(ESPN_LAST_SYNC_KEY, Date.now());
 
-    const oddsFallback = espnResult.unresolved.filter(
-      (m) =>
-        matchNeedsExternalScore(m) &&
-        (m.home_score === null || m.away_score === null)
+    const oddsFallback = espnResult.unresolved.filter((m) =>
+      matchNeedsScoreSync(m)
     );
 
     if (oddsFallback.length > 0 && isScoresApiConfigured()) {
@@ -417,7 +410,7 @@ export async function syncLiveScores(
       const oddsResult = await syncFromOddsApi(
         matches,
         syncedAt,
-        matches.filter(matchNeedsExternalScore)
+        matches.filter(matchNeedsScoreSync)
       );
       updated = oddsResult.updated;
       finalized = oddsResult.finalized;
@@ -438,14 +431,15 @@ export async function syncLiveScores(
     }
   }
 
-  if (needsRecalc) {
+  const reconcile = await reconcileRecentFinalScores();
+  if (needsRecalc || reconcile.needsRecalc) {
     const { recalculateAllScores } = await import("@/lib/data");
     await recalculateAllScores();
   }
 
   return {
     synced: true,
-    updated,
+    updated: updated + reconcile.corrected,
     finalized,
     liveMatchIds: [...new Set(liveMatchIds)],
     syncedAt,
@@ -453,4 +447,94 @@ export async function syncLiveScores(
     source,
     liveClockByMatchId,
   };
+}
+
+const RECONCILE_FINAL_HOURS = 72;
+
+export interface ReconcileFinalScoresResult {
+  corrected: number;
+  needsRecalc: boolean;
+}
+
+/** Fix recently finalized matches when external APIs report a different FT score. */
+export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScoresResult> {
+  const supabase = getSupabase();
+  const now = Date.now();
+  const cutoff = now - RECONCILE_FINAL_HOURS * 60 * 60 * 1000;
+  const syncedAt = new Date().toISOString();
+
+  const { data: matchRows } = await supabase
+    .from("matches")
+    .select(
+      "*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)"
+    )
+    .eq("status", "final")
+    .not("home_team_id", "is", null)
+    .not("away_team_id", "is", null)
+    .not("kickoff_at", "is", null);
+
+  const matches = ((matchRows ?? []) as Match[]).filter((match) => {
+    if (!match.kickoff_at) return false;
+    const kickoff = parseISO(match.kickoff_at).getTime();
+    return kickoff >= cutoff && kickoff <= now;
+  });
+
+  if (!matches.length) {
+    return { corrected: 0, needsRecalc: false };
+  }
+
+  const dates = new Set<string>();
+  for (const match of matches) {
+    const kickoff = parseISO(match.kickoff_at!);
+    dates.add(format(kickoff, "yyyyMMdd"));
+    dates.add(format(addDays(kickoff, -1), "yyyyMMdd"));
+    dates.add(format(addDays(kickoff, 1), "yyyyMMdd"));
+  }
+
+  const events = await fetchEspnWorldCupEvents([...dates]);
+  let corrected = 0;
+  let needsRecalc = false;
+
+  for (const match of matches) {
+    const event = matchEspnEventToFixture(events, match);
+    if (!event?.completed) continue;
+    if (
+      event.homeScore === match.home_score &&
+      event.awayScore === match.away_score
+    ) {
+      continue;
+    }
+
+    const winnerTeamId = inferWinnerTeamId(
+      match,
+      event.homeScore,
+      event.awayScore
+    );
+    const { error } = await supabase
+      .from("matches")
+      .update({
+        home_score: event.homeScore,
+        away_score: event.awayScore,
+        winner_team_id: winnerTeamId,
+        status: "final",
+        updated_at: syncedAt,
+      })
+      .eq("id", match.id);
+
+    if (error) {
+      console.error(
+        `Final score reconcile failed for match ${match.match_number}:`,
+        error.message
+      );
+      continue;
+    }
+
+    console.warn(
+      `Reconciled match ${match.match_number}: ${match.home_score}-${match.away_score} -> ${event.homeScore}-${event.awayScore}`
+    );
+    corrected++;
+    needsRecalc = true;
+  }
+
+  return { corrected, needsRecalc };
 }
