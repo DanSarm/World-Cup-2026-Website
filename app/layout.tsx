@@ -1,13 +1,9 @@
 import { Archivo, Saira_Condensed } from "next/font/google";
+import type { Viewport } from "next";
 import { getSession } from "@/lib/session";
-import {
-  APPLE_TOUCH_ICON_PATH,
-  APP_ICON_LARGE_PATH,
-} from "@/lib/site";
+import { APPLE_TOUCH_ICON_PATH, APP_ICON_LARGE_PATH } from "@/lib/site";
 import { Nav } from "@/components/Nav";
-import { BottomNav } from "@/components/BottomNav";
-import { NotificationProvider } from "@/components/NotificationProvider";
-import { RulesModal } from "@/components/RulesModal";
+import { ClientShell } from "@/components/ClientShell";
 import { FlagMarquee } from "@/components/FlagMarquee";
 import "./globals.css";
 
@@ -26,6 +22,14 @@ const sairaCondensed = Saira_Condensed({
 
 export const dynamic = "force-dynamic";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#002868",
+  colorScheme: "dark",
+};
+
 export const metadata = {
   title: "Family Cup 2026",
   description: "Private friends & family World Cup prediction pool",
@@ -42,7 +46,7 @@ export const metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent" as const,
+    statusBarStyle: "default" as const,
     title: "Family Cup 2026",
   },
 };
@@ -57,23 +61,21 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${archivo.variable} ${sairaCondensed.variable}`}>
       <body className={`app-bg ${archivo.className}`}>
-        <div className="relative z-10 min-h-dvh flex flex-col">
+        <div className="relative z-10 min-h-[100dvh] min-h-[100svh] min-h-[-webkit-fill-available] flex flex-col">
           <Nav isAdmin={session?.is_admin} />
           <div className="border-b border-white/5 bg-black/50 py-2">
             <div className="max-w-2xl mx-auto px-4">
               <FlagMarquee />
             </div>
           </div>
-          <main className="flex-1 w-full px-4 py-6 md:py-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-10">
-            <div className="max-w-2xl mx-auto">
-              <NotificationProvider enabled={Boolean(session)} />
-            </div>
-            {children}
+          <main className="flex-1 w-full px-4 py-6 md:py-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-10 pt-[env(safe-area-inset-top,0px)]">
+            <ClientShell
+              isAdmin={session?.is_admin}
+              sessionActive={Boolean(session)}
+            >
+              {children}
+            </ClientShell>
           </main>
-          <BottomNav isAdmin={session?.is_admin} />
-          <div className="md:hidden fixed top-4 right-4 z-30">
-            {session && <RulesModal variant="mobile" />}
-          </div>
         </div>
       </body>
     </html>

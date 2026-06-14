@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PickReminderPayload } from "@/lib/pickReminders";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+  safeSessionStorageGet,
+  safeSessionStorageSet,
+} from "@/lib/safeStorage";
 import { APP_ICON_PATH } from "@/lib/site";
 
 const DISMISS_KEY = "notifications-prompt-dismissed";
@@ -42,8 +48,8 @@ export function PushNotificationManager({
   useEffect(() => {
     if (!supportsNotifications()) return;
 
-    const dismissed = localStorage.getItem(DISMISS_KEY) === "1";
-    const subscribed = localStorage.getItem(SUBSCRIBED_KEY) === "1";
+    const dismissed = safeLocalStorageGet(DISMISS_KEY) === "1";
+    const subscribed = safeLocalStorageGet(SUBSCRIBED_KEY) === "1";
     if (subscribed || Notification.permission === "granted") {
       setVisible(false);
     } else if (!dismissed && Notification.permission === "default") {
@@ -64,7 +70,7 @@ export function PushNotificationManager({
     if (!pickReminder || !supportsNotifications()) return;
     if (Notification.permission !== "granted") return;
     if (shownTagsRef.current.has(pickReminder.tag)) return;
-    if (sessionStorage.getItem(pickReminder.tag) === "1") return;
+    if (safeSessionStorageGet(pickReminder.tag) === "1") return;
 
     try {
       const notification = new Notification(pickReminder.title, {
@@ -78,7 +84,7 @@ export function PushNotificationManager({
         notification.close();
       };
       shownTagsRef.current.add(pickReminder.tag);
-      sessionStorage.setItem(pickReminder.tag, "1");
+      safeSessionStorageSet(pickReminder.tag, "1");
     } catch {
       /* ignore blocked notifications */
     }
@@ -155,7 +161,7 @@ export function PushNotificationManager({
         throw new Error(err.error ?? "Failed to save subscription");
       }
 
-      localStorage.setItem(SUBSCRIBED_KEY, "1");
+      safeLocalStorageSet(SUBSCRIBED_KEY, "1");
       setVisible(false);
       setStatus(null);
     } catch (error) {
@@ -168,7 +174,7 @@ export function PushNotificationManager({
   }, [pushConfigured]);
 
   const dismiss = useCallback(() => {
-    localStorage.setItem(DISMISS_KEY, "1");
+    safeLocalStorageSet(DISMISS_KEY, "1");
     setVisible(false);
   }, []);
 

@@ -38,13 +38,18 @@
   --shadow-glow-gold: 0 0 40px -8px rgb(212 175 55 / 0.45);
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
+}
 
 body {
   font-family: var(--font-sans);
   background-color: var(--color-black);
-  color: var(--color-ink);
+  color: rgb(255 255 255 / 0.92);
   min-height: 100dvh;
+  min-height: 100svh;
+  min-height: -webkit-fill-available;
   -webkit-font-smoothing: antialiased;
 }
 

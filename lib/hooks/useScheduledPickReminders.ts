@@ -4,6 +4,10 @@ import { parseISO } from "date-fns";
 import { useEffect, useRef } from "react";
 import type { PickScheduleItem } from "@/lib/pickReminders";
 import { PICK_REMINDER_MINUTES } from "@/lib/pickReminderConstants";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+} from "@/lib/safeStorage";
 import { APP_ICON_PATH } from "@/lib/site";
 
 const SCHEDULED_PREFIX = "scheduled-pick:";
@@ -12,7 +16,7 @@ function showLocalNotification(item: PickScheduleItem) {
   if (typeof window === "undefined" || Notification.permission !== "granted") {
     return;
   }
-  if (localStorage.getItem(`${SCHEDULED_PREFIX}${item.tag}`) === "1") return;
+  if (safeLocalStorageGet(`${SCHEDULED_PREFIX}${item.tag}`) === "1") return;
 
   try {
     const notification = new Notification(item.title, {
@@ -25,7 +29,7 @@ function showLocalNotification(item: PickScheduleItem) {
       window.location.href = item.url;
       notification.close();
     };
-    localStorage.setItem(`${SCHEDULED_PREFIX}${item.tag}`, "1");
+    safeLocalStorageSet(`${SCHEDULED_PREFIX}${item.tag}`, "1");
   } catch {
     /* ignore */
   }
@@ -49,7 +53,7 @@ export function useScheduledPickReminders(items: PickScheduleItem[]) {
       const fireAt = kickoff - PICK_REMINDER_MINUTES * 60_000;
       const delay = fireAt - Date.now();
       if (delay <= 0) continue;
-      if (localStorage.getItem(`${SCHEDULED_PREFIX}${item.tag}`) === "1") {
+      if (safeLocalStorageGet(`${SCHEDULED_PREFIX}${item.tag}`) === "1") {
         continue;
       }
 
