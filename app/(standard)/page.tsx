@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/auth";
-import { getLeaderboardData, getMatchesWithTeams, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
+import { getLeaderboardData, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
 import { calculatePrizePool } from "@/lib/payouts";
 import { findNextUpcomingMatches } from "@/lib/nextPick";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
@@ -11,34 +11,22 @@ import { AllPicksDoneHero } from "@/components/AllPicksDoneHero";
 import { HomeFeaturedMatchSection } from "@/components/HomeFeaturedMatchSection";
 import { HomePodiumSection } from "@/components/HomePodiumSection";
 import { HomeTopFive } from "@/components/HomeTopFive";
-import { findCurrentlyPlayingMatches, isAnyMatchNeedingScoreSync, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
-import { syncLiveScores } from "@/lib/scores/sync";
+import { findCurrentlyPlayingMatches, hasAnyDisplayableLiveScore } from "@/lib/matchLive";
 import { filterCommunityPicksForViewer } from "@/lib/pickVisibility";
 
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [{ leaderboard: leaderboardInitial }, matchesRaw, predictions, settings, teams, myPodium, players] = await Promise.all([
-    getLeaderboardData(),
-    getMatchesWithTeams(),
-    getPredictions(session.id),
-    getSettings(),
-    getTeams(),
-    getMyTournamentPodium(session.id),
-    getPlayers(),
-  ]);
-
-  const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (isAnyMatchNeedingScoreSync(matchesRaw)) {
-    await syncLiveScores(true);
-  }
-  const matches =
-    liveMatchesInitial.length > 0 ? await getMatchesWithTeams() : matchesRaw;
-  const { leaderboard } =
-    liveMatchesInitial.length > 0
-      ? await getLeaderboardData({ includeLiveScores: true })
-      : { leaderboard: leaderboardInitial };
+  const [{ leaderboard, matches }, predictions, settings, teams, myPodium, players] =
+    await Promise.all([
+      getLeaderboardData({ skipScoreSync: true }),
+      getPredictions(session.id),
+      getSettings(),
+      getTeams(),
+      getMyTournamentPodium(session.id),
+      getPlayers(),
+    ]);
 
   const prizePool = calculatePrizePool(players.filter((p) => p.paid).length);
 

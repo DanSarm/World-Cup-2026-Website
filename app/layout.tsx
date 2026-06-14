@@ -3,7 +3,9 @@ import type { Viewport } from "next";
 import { getSession } from "@/lib/session";
 import { APPLE_TOUCH_ICON_PATH, APP_ICON_LARGE_PATH } from "@/lib/site";
 import { Nav } from "@/components/Nav";
-import { ClientShell } from "@/components/ClientShell";
+import { BottomNav } from "@/components/BottomNav";
+import { NotificationsSlot } from "@/components/NotificationsSlot";
+import { RulesModal } from "@/components/RulesModal";
 import { FlagMarquee } from "@/components/FlagMarquee";
 import "./globals.css";
 
@@ -69,13 +71,13 @@ export default async function RootLayout({
             </div>
           </div>
           <main className="flex-1 w-full px-4 py-6 md:py-8 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:pb-10 pt-[env(safe-area-inset-top,0px)]">
-            <ClientShell
-              isAdmin={session?.is_admin}
-              sessionActive={Boolean(session)}
-            >
-              {children}
-            </ClientShell>
+            <NotificationsSlot enabled={Boolean(session)} />
+            {children}
           </main>
+          <BottomNav isAdmin={session?.is_admin} />
+          <div className="md:hidden fixed top-4 right-4 z-30">
+            {session && <RulesModal variant="mobile" />}
+          </div>
         </div>
       </body>
     </html>

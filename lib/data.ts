@@ -399,6 +399,8 @@ async function finalizeCompletedMatches(matches: Match[]): Promise<number> {
 
 export async function getLeaderboardData(options?: {
   includeLiveScores?: boolean;
+  /** Skip ESPN/API score sync during SSR — client polls instead (fixes slow iOS loads). */
+  skipScoreSync?: boolean;
 }): Promise<{
   leaderboard: LeaderboardEntry[];
   finalsLeaderboard: ReturnType<typeof getFinalsChallengeLeaderboard>;
@@ -409,9 +411,13 @@ export async function getLeaderboardData(options?: {
   hasLiveScoring: boolean;
 }> {
   const includeLiveScores = options?.includeLiveScores ?? false;
+  const skipScoreSync = options?.skipScoreSync ?? false;
   let matches = await getMatchesWithTeams();
 
-  if (isAnyMatchNeedingScoreSync(matches) || matches.some(shouldAutoFinalizeMatch)) {
+  if (
+    !skipScoreSync &&
+    (isAnyMatchNeedingScoreSync(matches) || matches.some(shouldAutoFinalizeMatch))
+  ) {
     const { syncLiveScores } = await import("./scores/sync");
     await syncLiveScores(true);
     matches = await getMatchesWithTeams();

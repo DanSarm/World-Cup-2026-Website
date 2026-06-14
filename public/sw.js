@@ -1,20 +1,5 @@
 /* eslint-disable no-restricted-globals */
-
-const SW_VERSION = "2";
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
-});
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
-// iOS PWA: always load pages from the network — never serve a stale offline shell.
-self.addEventListener("fetch", (event) => {
-  if (event.request.mode !== "navigate") return;
-  event.respondWith(fetch(event.request));
-});
+/* Push notifications only — no fetch handler (keeps iOS Safari page loads reliable). */
 
 self.addEventListener("push", (event) => {
   let payload = {
@@ -38,7 +23,7 @@ self.addEventListener("push", (event) => {
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: payload.tag,
-      data: { url: payload.url, swVersion: SW_VERSION },
+      data: { url: payload.url },
     })
   );
 });

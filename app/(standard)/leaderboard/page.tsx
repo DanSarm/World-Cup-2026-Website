@@ -3,7 +3,6 @@ import { getSession } from "@/lib/session";
 import {
   getLeaderboardData,
   getPredictions,
-  getMatchesWithTeams,
   getTournamentPodiumPredictions,
   getFinalsPredictions,
   getAdjustments,
@@ -14,21 +13,13 @@ import { computePoolHighlights } from "@/lib/poolHighlights";
 import { calculatePrizePool } from "@/lib/payouts";
 import { LeaderboardClient } from "@/components/LeaderboardClient";
 import {
-  findCurrentlyPlayingMatches,
   isAnyMatchNeedingScoreSync,
   hasAnyDisplayableLiveScore,
 } from "@/lib/matchLive";
-import { syncLiveScores } from "@/lib/scores/sync";
 
 export default async function LeaderboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-
-  const matchesRaw = await getMatchesWithTeams();
-  const liveMatchesInitial = findCurrentlyPlayingMatches(matchesRaw);
-  if (isAnyMatchNeedingScoreSync(matchesRaw)) {
-    await syncLiveScores(true);
-  }
 
   const [
     { leaderboard, settings, matches, players },
@@ -39,9 +30,7 @@ export default async function LeaderboardPage() {
     actualResults,
     teams,
   ] = await Promise.all([
-    liveMatchesInitial.length > 0
-      ? getLeaderboardData({ includeLiveScores: true })
-      : getLeaderboardData(),
+    getLeaderboardData({ skipScoreSync: true }),
     getPredictions(),
     getTournamentPodiumPredictions(),
     getFinalsPredictions(),
