@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PickReminderPayload } from "@/lib/pickReminders";
+import { APP_ICON_PATH } from "@/lib/site";
 
 const DISMISS_KEY = "notifications-prompt-dismissed";
 const SUBSCRIBED_KEY = "notifications-push-subscribed";
@@ -68,7 +69,7 @@ export function PushNotificationManager({
     try {
       const notification = new Notification(pickReminder.title, {
         body: pickReminder.body,
-        icon: "/logo/clipart1360288.png",
+        icon: APP_ICON_PATH,
         tag: pickReminder.tag,
       });
       notification.onclick = () => {

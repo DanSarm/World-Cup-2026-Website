@@ -4,6 +4,7 @@ import { parseISO } from "date-fns";
 import { useEffect, useRef } from "react";
 import type { PickScheduleItem } from "@/lib/pickReminders";
 import { PICK_REMINDER_MINUTES } from "@/lib/pickReminderConstants";
+import { APP_ICON_PATH } from "@/lib/site";
 
 const SCHEDULED_PREFIX = "scheduled-pick:";
 
@@ -16,7 +17,7 @@ function showLocalNotification(item: PickScheduleItem) {
   try {
     const notification = new Notification(item.title, {
       body: item.body,
-      icon: "/logo/clipart1360288.png",
+      icon: APP_ICON_PATH,
       tag: item.tag,
     });
     notification.onclick = () => {

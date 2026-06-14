@@ -1,5 +1,9 @@
 import { Archivo, Saira_Condensed } from "next/font/google";
 import { getSession } from "@/lib/session";
+import {
+  APPLE_TOUCH_ICON_PATH,
+  APP_ICON_LARGE_PATH,
+} from "@/lib/site";
 import { Nav } from "@/components/Nav";
 import { BottomNav } from "@/components/BottomNav";
 import { NotificationProvider } from "@/components/NotificationProvider";
@@ -26,6 +30,16 @@ export const metadata = {
   title: "Family Cup 2026",
   description: "Private friends & family World Cup prediction pool",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: APP_ICON_LARGE_PATH, sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: APPLE_TOUCH_ICON_PATH, sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent" as const,
