@@ -42,6 +42,7 @@ export function RulesModal({ variant = "default" }: RulesModalProps) {
                 ["🔥", "Hard picks get bonus points."],
                 ["🔥", "Crazy exact scores get fire bonus."],
                 ["🔒", "Picks lock at kickoff."],
+                ["⭕", "No pick = 0 points (grey dot on leaderboard)."],
                 ["🏆", "Most points wins."],
               ].map(([icon, text]) => (
                 <li key={text} className="flex items-center gap-3">

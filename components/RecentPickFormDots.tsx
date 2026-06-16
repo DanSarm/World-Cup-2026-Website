@@ -16,6 +16,7 @@ const SLOT_LABELS: Record<NonNullable<PickFormSlot>, string> = {
   exact: "Exact score",
   correct: "Correct winner",
   wrong: "Wrong winner",
+  missed: "No pick submitted",
   "live-exact": "Exact score right now",
   "live-correct": "Winning pick so far",
   "live-wrong": "Can't win anymore",
@@ -32,8 +33,8 @@ function slotShellClass(result: PickFormSlot): string {
   if (result === "wrong" || result === "live-wrong") {
     return "bg-canada ring-2 ring-canada-light shadow-[0_1px_6px_rgb(200_16_46/0.55)]";
   }
-  if (result === "live-pending") {
-    return "bg-ink/25 ring-2 ring-ink/30";
+  if (result === "live-pending" || result === "missed") {
+    return "bg-ink/20 ring-2 ring-ink/25";
   }
   return "bg-ink/15 ring-1 ring-ink/25";
 }
@@ -76,6 +77,15 @@ function SlotIcon({ result }: { result: PickFormSlot }) {
           d="M4.1 4.1a.55.55 0 0 1 .78 0L6 5.22l1.12-1.12a.55.55 0 1 1 .78.78L6.78 6l1.12 1.12a.55.55 0 1 1-.78.78L6 6.78 4.88 7.9a.55.55 0 1 1-.78-.78L5.22 6 4.1 4.88a.55.55 0 0 1 0-.78Z"
         />
       </svg>
+    );
+  }
+
+  if (result === "missed") {
+    return (
+      <span
+        className="w-1.5 h-1.5 rounded-full bg-ink/35"
+        aria-hidden
+      />
     );
   }
 

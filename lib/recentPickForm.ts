@@ -1,4 +1,4 @@
-import { isConfirmedPick, getEffectiveMatchPrediction } from "./pickUtils";
+import { hasSavedPick, isConfirmedPick } from "./pickUtils";
 import { scoreMatchPrediction } from "./scoring";
 import type { ScoringConfig } from "./scoringConfig";
 import { hasDisplayableLiveScore } from "./matchLive";
@@ -163,23 +163,6 @@ function compareMatchesChronologically(a: Match, b: Match): number {
   return a.match_number - b.match_number;
 }
 
-/** Display-only default for form dots — never written to the database. */
-const DEFAULT_MISSING_FORM_PICK = {
-  pred_home_score: 0,
-  pred_away_score: 0,
-  pred_winner_team_id: null,
-} as const;
-
-function getFormDisplayPick(
-  match: Pick<Match, "status" | "kickoff_at">,
-  prediction?: MatchPrediction | null
-): Pick<
-  MatchPrediction,
-  "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
-> {
-  return getEffectiveMatchPrediction(match, prediction) ?? DEFAULT_MISSING_FORM_PICK;
-}
-
 export function buildPlayerRecentForm(
   playerId: string,
   matches: Match[],
@@ -199,11 +182,15 @@ export function buildPlayerRecentForm(
 
   const results: PickFormResult[] = [];
   for (const match of resultMatches) {
-    const pred = getFormDisplayPick(match, predByMatchId.get(match.id));
+    const prediction = predByMatchId.get(match.id);
+    if (!hasSavedPick(prediction)) {
+      results.push("missed");
+      continue;
+    }
     const result =
       match.status === "final"
-        ? classifyPickResult(match, pred, scoringConfig)
-        : classifyLivePickResult(match, pred, scoringConfig);
+        ? classifyPickResult(match, prediction!, scoringConfig)
+        : classifyLivePickResult(match, prediction!, scoringConfig);
     if (result) results.push(result);
   }
 

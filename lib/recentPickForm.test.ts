@@ -165,7 +165,7 @@ const sixPicksOnly: MatchPrediction[] = [
   pred("f4", 2, 1),
   pred("f5", 0, 0),
   pred("f6", 1, 1),
-  // f7: no pick — treated as 0-0 for form dots only
+  // f7: no pick — grey missed dot, not scored as 0-0
 ];
 
 const sevenSlotForm = buildPlayerRecentForm(
@@ -180,8 +180,8 @@ assert(
   "shows a dot for every finished match"
 );
 assert(
-  sevenSlotForm[9] === "wrong",
-  "missing pick on f7 (1-0 final) counts as 0-0 wrong"
+  sevenSlotForm[9] === "missed",
+  "missing pick on f7 shows grey missed dot"
 );
 assert(
   sevenSlotForm[4] === "exact",

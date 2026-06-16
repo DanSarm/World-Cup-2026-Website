@@ -156,7 +156,7 @@ export interface TournamentPodiumPrediction {
 
 export type PodiumTeamRef = Pick<Team, "fifa_code" | "short_name" | "name">;
 
-export type PickFormFinalResult = "exact" | "correct" | "wrong";
+export type PickFormFinalResult = "exact" | "correct" | "wrong" | "missed";
 export type PickFormLiveResult =
   | "live-exact"
   | "live-correct"
