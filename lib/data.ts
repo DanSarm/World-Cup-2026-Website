@@ -374,21 +374,6 @@ function attachRankMovement(
   });
 }
 
-async function finalizeCompletedMatches(matches: Match[]): Promise<number> {
-  const supabase = getSupabase();
-  let count = 0;
-  for (const match of matches) {
-    if (!shouldAutoFinalizeMatch(match)) continue;
-    const { error } = await supabase
-      .from("matches")
-      .update({ status: "final", updated_at: new Date().toISOString() })
-      .eq("id", match.id);
-    if (!error) count++;
-  }
-  return count;
-}
-
-/** Promote played matches that have scores but were left as scheduled (sync bug). */
 async function finalizeScheduledMatchesWithScores(
   matches: Match[]
 ): Promise<number> {
@@ -431,10 +416,6 @@ export async function getLeaderboardData(options?: {
   ) {
     const { syncLiveScores } = await import("./scores/sync");
     await syncLiveScores(true);
-    matches = await getMatchesWithTeams();
-  }
-
-  if (await finalizeCompletedMatches(matches)) {
     matches = await getMatchesWithTeams();
   }
   if (await finalizeScheduledMatchesWithScores(matches)) {

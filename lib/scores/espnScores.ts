@@ -1,8 +1,16 @@
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import type { Match } from "@/lib/types";
 import { teamNameMatches } from "@/lib/odds/teamAliases";
-import { matchNeedsScoreSync } from "@/lib/matchLive";
+import { matchNeedsScoreSync, shouldAutoFinalizeMatch } from "@/lib/matchLive";
 import { formatEspnLiveClock } from "@/lib/liveClock";
+
+/** ESPN lists US-hosted fixtures by local calendar day — include UTC + US zones. */
+const ESPN_SCOREBOARD_TZS = [
+  "UTC",
+  "America/Los_Angeles",
+  "America/New_York",
+] as const;
 
 const ESPN_WC_SCOREBOARD =
   "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard";
@@ -73,6 +81,19 @@ function parseEspnEvent(raw: NonNullable<EspnScoreboardResponse["events"]>[numbe
   };
 }
 
+/** YYYYMMDD keys for ESPN scoreboard around a kickoff (handles late-night US fixtures). */
+export function espnScoreboardDatesForKickoff(kickoffAt: string): string[] {
+  const kickoff = parseISO(kickoffAt);
+  const dates = new Set<string>();
+  for (const tz of ESPN_SCOREBOARD_TZS) {
+    for (const offset of [-1, 0, 1] as const) {
+      const day = offset === 0 ? kickoff : addDays(kickoff, offset);
+      dates.add(formatInTimeZone(day, tz, "yyyyMMdd"));
+    }
+  }
+  return [...dates];
+}
+
 /** YYYYMMDD keys for ESPN scoreboard queries around in-play fixtures. */
 export function scoreboardDatesForMatches(matches: Match[]): string[] {
   const dates = new Set<string>();
@@ -82,17 +103,18 @@ export function scoreboardDatesForMatches(matches: Match[]): string[] {
   for (const match of matches) {
     if (!match.kickoff_at) continue;
     const inWindow = matchNeedsScoreSync(match);
+    const needsFinalCheck = shouldAutoFinalizeMatch(match);
     const kickoff = parseISO(match.kickoff_at);
     const recentlyEnded =
       match.status !== "final" &&
       now >= kickoff.getTime() &&
       now - kickoff.getTime() <= sixHoursMs;
 
-    if (!inWindow && !recentlyEnded) continue;
+    if (!inWindow && !recentlyEnded && !needsFinalCheck) continue;
 
-    dates.add(format(kickoff, "yyyyMMdd"));
-    dates.add(format(addDays(kickoff, -1), "yyyyMMdd"));
-    dates.add(format(addDays(kickoff, 1), "yyyyMMdd"));
+    for (const d of espnScoreboardDatesForKickoff(match.kickoff_at)) {
+      dates.add(d);
+    }
   }
 
   return [...dates].sort();

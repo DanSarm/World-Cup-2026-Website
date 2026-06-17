@@ -9,7 +9,7 @@ import {
   recordOddsApiUsage,
   shouldIncludeRecentCompletedScores,
 } from "@/lib/odds/quotaGuard";
-import { parseISO, format, addDays } from "date-fns";
+import { parseISO } from "date-fns";
 import {
   shouldSyncLiveScoresFromApi,
   isMatchInPlayWindow,
@@ -24,6 +24,7 @@ import {
 } from "./theOddsApiScores";
 import {
   espnMinSyncIntervalMs,
+  espnScoreboardDatesForKickoff,
   fetchEspnWorldCupEvents,
   matchEspnEventToFixture,
   scoreboardDatesForMatches,
@@ -111,6 +112,7 @@ async function setLastSyncTime(key: string, ts: number): Promise<void> {
 
 function shouldSyncScores(matches: Match[]): boolean {
   if (shouldSyncLiveScoresFromApi(matches)) return true;
+  if (matches.some(shouldAutoFinalizeMatch)) return true;
   const now = Date.now();
   const sixHoursMs = 6 * 60 * 60 * 1000;
   return matches.some((m) => {
@@ -207,7 +209,7 @@ async function syncFromEspn(
   const liveClockByMatchId: Record<string, string> = {};
 
   for (const match of matches) {
-    if (!matchNeedsScoreSync(match)) continue;
+    if (!matchNeedsScoreSync(match) && !shouldAutoFinalizeMatch(match)) continue;
 
     const event = matchEspnEventToFixture(events, match);
     if (!event) {
@@ -351,6 +353,38 @@ async function syncFromOddsApi(
   };
 }
 
+async function applyReconcileAndRecalc(
+  hadScoreUpdates: boolean,
+  finalizedMatchIds: string[],
+  updatedMatchIds: string[]
+): Promise<{
+  reconcileCorrected: number;
+  correctedMatchIds: string[];
+}> {
+  const reconcile = await reconcileRecentFinalScores();
+  const correctedMatchIds = reconcile.correctedMatchIds;
+  const allFinalized = [...new Set([...finalizedMatchIds, ...correctedMatchIds])];
+
+  if (hadScoreUpdates || reconcile.needsRecalc) {
+    const { recalculateAllScores } = await import("@/lib/data");
+    await recalculateAllScores();
+  }
+  if (allFinalized.length > 0 || updatedMatchIds.length > 0) {
+    const { fireScoreNotifications } = await import(
+      "@/lib/notifications/scoreEvents"
+    );
+    fireScoreNotifications({
+      finalizedMatchIds: allFinalized,
+      updatedMatchIds: [...new Set(updatedMatchIds)],
+    });
+  }
+
+  return {
+    reconcileCorrected: reconcile.corrected,
+    correctedMatchIds,
+  };
+}
+
 export async function syncLiveScores(
   force = false
 ): Promise<SyncLiveScoresResult> {
@@ -369,16 +403,17 @@ export async function syncLiveScores(
   const matches = (matchRows ?? []) as Match[];
 
   if (!shouldSyncScores(matches)) {
+    const maintenance = await applyReconcileAndRecalc(false, [], []);
     return {
-      synced: false,
+      synced: maintenance.reconcileCorrected > 0,
       skipped: "no match in play window",
-      updated: 0,
+      updated: maintenance.reconcileCorrected,
       finalized: 0,
       liveMatchIds: [],
-      finalizedMatchIds: [],
+      finalizedMatchIds: maintenance.correctedMatchIds,
       updatedMatchIds: [],
       syncedAt,
-      source: "none",
+      source: maintenance.reconcileCorrected > 0 ? "espn" : "none",
     };
   }
 
@@ -431,9 +466,9 @@ export async function syncLiveScores(
     liveClockByMatchId = espnResult.liveClockByMatchId;
     await setLastSyncTime(ESPN_LAST_SYNC_KEY, Date.now());
 
-    const oddsFallback = espnResult.unresolved.filter((m) =>
-      matchNeedsScoreSync(m)
-    );
+  const oddsFallback = espnResult.unresolved.filter(
+    (m) => matchNeedsScoreSync(m) || shouldAutoFinalizeMatch(m)
+  );
 
     if (oddsFallback.length > 0 && isScoresApiConfigured()) {
       const oddsResult = await syncFromOddsApi(matches, syncedAt, oddsFallback);
@@ -480,30 +515,20 @@ export async function syncLiveScores(
     }
   }
 
-  const reconcile = await reconcileRecentFinalScores();
-  if (reconcile.corrected > 0) {
-    needsRecalc = true;
-    finalizedMatchIds.push(...reconcile.correctedMatchIds);
-  }
-
-  if (needsRecalc || reconcile.needsRecalc) {
-    const { recalculateAllScores } = await import("@/lib/data");
-    await recalculateAllScores();
-    const { fireScoreNotifications } = await import(
-      "@/lib/notifications/scoreEvents"
-    );
-    fireScoreNotifications({
-      finalizedMatchIds: [...new Set(finalizedMatchIds)],
-      updatedMatchIds: [...new Set(updatedMatchIds)],
-    });
-  }
+  const maintenance = await applyReconcileAndRecalc(
+    needsRecalc,
+    finalizedMatchIds,
+    updatedMatchIds
+  );
 
   return {
     synced: true,
-    updated: updated + reconcile.corrected,
+    updated: updated + maintenance.reconcileCorrected,
     finalized,
     liveMatchIds: [...new Set(liveMatchIds)],
-    finalizedMatchIds: [...new Set(finalizedMatchIds)],
+    finalizedMatchIds: [
+      ...new Set([...finalizedMatchIds, ...maintenance.correctedMatchIds]),
+    ],
     updatedMatchIds: [...new Set(updatedMatchIds)],
     syncedAt,
     quotaCost,
@@ -549,10 +574,10 @@ export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScores
 
   const dates = new Set<string>();
   for (const match of matches) {
-    const kickoff = parseISO(match.kickoff_at!);
-    dates.add(format(kickoff, "yyyyMMdd"));
-    dates.add(format(addDays(kickoff, -1), "yyyyMMdd"));
-    dates.add(format(addDays(kickoff, 1), "yyyyMMdd"));
+    if (!match.kickoff_at) continue;
+    for (const d of espnScoreboardDatesForKickoff(match.kickoff_at)) {
+      dates.add(d);
+    }
   }
 
   const events = await fetchEspnWorldCupEvents([...dates]);
