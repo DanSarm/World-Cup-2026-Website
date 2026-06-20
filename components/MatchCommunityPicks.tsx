@@ -4,7 +4,6 @@ import { useState, Fragment, type ReactNode } from "react";
 import { hasDisplayableLiveScore, isMatchDecidedForScoring } from "@/lib/matchLive";
 import type { CommunityMatchPick } from "@/lib/types";
 import {
-  isPickExactImpossible,
   isPickLiveEliminated,
 } from "@/lib/recentPickForm";
 import {
@@ -326,12 +325,19 @@ export function MatchCommunityPicks({
           pred_away_score: pick.predAwayScore,
           pred_winner_team_id: pick.predWinnerTeamId,
         });
-        const aOut =
-          isPickExactImpossible(match, a) ||
-          isPickLiveEliminated(match, pickPrediction(a), scoringConfig);
-        const bOut =
-          isPickExactImpossible(match, b) ||
-          isPickLiveEliminated(match, pickPrediction(b), scoringConfig);
+        const aPts = earnedPointsForPick(a).points;
+        const bPts = earnedPointsForPick(b).points;
+        if (bPts !== aPts) return bPts - aPts;
+        const aOut = isPickLiveEliminated(
+          match,
+          pickPrediction(a),
+          scoringConfig
+        );
+        const bOut = isPickLiveEliminated(
+          match,
+          pickPrediction(b),
+          scoringConfig
+        );
         if (aOut !== bOut) return aOut ? 1 : -1;
       } else {
         const aPts = earnedPointsForPick(a).points;
@@ -388,12 +394,10 @@ export function MatchCommunityPicks({
     const isLive = showingLiveScore;
     const liveEliminated =
       isLive && isPickLiveEliminated(match, pickPrediction, scoringConfig);
-    const exactImpossible =
-      isLive && isPickExactImpossible(match, pick);
     const exactRightNow = isPickExactRightNow(pick);
     const rowStateClass = exactRightNow
       ? "bg-mexico/10"
-      : liveEliminated || exactImpossible
+      : liveEliminated
         ? "opacity-45 grayscale"
         : isYou
           ? "bg-usa/5"

@@ -2,6 +2,7 @@ import {
   buildPlayerRecentForm,
   classifyLivePickResult,
   classifyPickResult,
+  isPickLiveEliminated,
 } from "./recentPickForm";
 import { DEFAULT_SCORING_CONFIG } from "./scoringConfig";
 import type { Match, MatchPrediction } from "./types";
@@ -192,7 +193,7 @@ const liveMatch: Match = {
   ...matchBase,
   id: "live",
   match_number: 7,
-  status: "locked",
+  status: "live",
   home_score: 1,
   away_score: 0,
   winner_team_id: null,
@@ -210,13 +211,36 @@ assert(
 );
 assert(
   classifyLivePickResult(liveMatch, pred("live", 0, 1), DEFAULT_SCORING_CONFIG) ===
-    "live-wrong",
-  "away win pick wrong when home leads"
+    "live-pending",
+  "away win pick still possible when home leads"
 );
 assert(
   classifyLivePickResult(liveMatch, pred("live", 1, 2), DEFAULT_SCORING_CONFIG) ===
-    "live-wrong",
-  "away win scoreline wrong when home leads"
+    "live-pending",
+  "away win scoreline still possible when home leads"
+);
+
+const trailingHomePick: Match = {
+  ...matchBase,
+  id: "live2",
+  match_number: 8,
+  status: "live",
+  home_score: 0,
+  away_score: 1,
+  winner_team_id: null,
+};
+assert(
+  classifyLivePickResult(trailingHomePick, pred("live2", 4, 1), DEFAULT_SCORING_CONFIG) ===
+    "live-pending",
+  "home win pick still possible when away leads"
+);
+assert(
+  !isPickLiveEliminated(
+    trailingHomePick,
+    pred("live2", 4, 1),
+    DEFAULT_SCORING_CONFIG
+  ),
+  "4-1 not eliminated at live 0-1"
 );
 assert(
   classifyLivePickResult(liveMatch, pred("live", 2, 0), DEFAULT_SCORING_CONFIG) ===

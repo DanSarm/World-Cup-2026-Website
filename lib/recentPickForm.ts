@@ -80,13 +80,23 @@ export function predictedMatchResult(
   return "draw";
 }
 
-function currentMatchResult(
+export function canPredictedResultStillHappen(
   home: number,
-  away: number
-): "home" | "away" | "draw" {
-  if (home > away) return "home";
-  if (away > home) return "away";
-  return "draw";
+  away: number,
+  predHome: number,
+  predAway: number
+): boolean {
+  const predResult = predictedMatchResult(predHome, predAway);
+  if (predResult === "home") {
+    const fh = Math.max(home, away + 1);
+    return fh >= home && fh > away;
+  }
+  if (predResult === "away") {
+    const fa = Math.max(away, home + 1);
+    return fa >= away && fa > home;
+  }
+  const level = Math.max(home, away);
+  return level >= home && level >= away;
 }
 
 export function classifyLivePickResult(
@@ -106,24 +116,18 @@ export function classifyLivePickResult(
 
   if (home === predHome && away === predAway) return "live-exact";
 
-  const predResult = predictedMatchResult(predHome, predAway);
-  const liveResult = currentMatchResult(home, away);
-
-  if (
-    liveResult !== "draw" &&
-    predResult !== "draw" &&
-    predResult !== liveResult
-  ) {
-    return "live-wrong";
-  }
-
-  const exactImpossible = isPickExactImpossible(match, prediction);
   const scored = scoreMatchPrediction(match, prediction, scoringConfig, {
     allowLive: true,
   });
 
-  if (exactImpossible && !scored.correctResult) return "live-wrong";
-  if (scored.correctResult) return "live-correct";
+  if (scored.correctResult || scored.knockoutCorrect) return "live-correct";
+
+  if (
+    !canPredictedResultStillHappen(home, away, predHome, predAway)
+  ) {
+    return "live-wrong";
+  }
+
   return "live-pending";
 }
 
@@ -133,9 +137,13 @@ export function isPickLiveEliminated(
     MatchPrediction,
     "pred_home_score" | "pred_away_score" | "pred_winner_team_id"
   >,
-  scoringConfig: ScoringConfig
+  _scoringConfig?: ScoringConfig
 ): boolean {
-  return classifyLivePickResult(match, prediction, scoringConfig) === "live-wrong";
+  if (!hasDisplayableLiveScore(match)) return false;
+  const home = match.home_score!;
+  const away = match.away_score!;
+  const { predHome, predAway } = pickScores(prediction);
+  return !canPredictedResultStillHappen(home, away, predHome, predAway);
 }
 
 /** Rightmost dot = live status for the match card currently in progress. */
