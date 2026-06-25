@@ -1,5 +1,9 @@
-import { buildKnockoutBracket } from "./knockoutBracket";
-import type { PickScore } from "./groupStandings";
+import {
+  buildKnockoutBracket,
+  buildThirdPlaceTable,
+  compareThirdPlaceCandidates,
+} from "./knockoutBracket";
+import type { PickScore, GroupStandingRow } from "./groupStandings";
 import type { Match, MatchPrediction, Team } from "./types";
 
 let passed = 0;
@@ -190,6 +194,55 @@ const withKo = buildKnockoutBracket(
 
 const m90 = withKo.byNumber.get(90)!;
 assert(m90.home.team?.team.fifa_code === "CZE", "M90 home is winner of M73");
+
+function standingRow(
+  team: Team,
+  rank: number,
+  points: number,
+  goalDiff: number,
+  goalsFor: number
+): GroupStandingRow {
+  return {
+    teamId: team.id,
+    team,
+    played: 3,
+    won: 0,
+    drawn: 0,
+    lost: 0,
+    goalsFor,
+    goalsAgainst: goalsFor - goalDiff,
+    goalDiff,
+    points,
+    rank,
+  };
+}
+
+const tieA = {
+  letter: "B",
+  row: standingRow({ ...team("BRA", "B"), market_rank: 5 }, 3, 6, 2, 5),
+};
+const tieB = {
+  letter: "C",
+  row: standingRow({ ...team("COL", "C"), market_rank: 11 }, 3, 6, 2, 5),
+};
+assert(
+  compareThirdPlaceCandidates(tieA, tieB) < 0,
+  "FIFA ranking tiebreak: better market rank wins"
+);
+
+const thirdTable = buildThirdPlaceTable(
+  [...groupMatches, ...koMatches],
+  pickScores
+);
+assert(thirdTable.entries.length === 2, "third-place table lists available groups");
+assert(
+  thirdTable.entries.every((e) => e.qualifies),
+  "all listed third-place teams advance when fewer than 8"
+);
+assert(
+  !thirdTable.hasFullCombination,
+  "no Annex C mapping until 8 qualifiers"
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

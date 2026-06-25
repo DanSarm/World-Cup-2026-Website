@@ -165,6 +165,137 @@ interface ThirdPlaceCandidate {
   row: GroupStandingRow;
 }
 
+/** Fair-play conduct score (higher = better). Not tracked yet — all teams tie at 0. */
+function teamConductScore(_team: Team): number {
+  return 0;
+}
+
+/** FIFA world ranking for tiebreaks (lower number = better). Falls back to pre-tournament market rank. */
+function fifaRankingForTiebreak(team: Team): number {
+  return team.market_rank ?? 9999;
+}
+
+export function compareThirdPlaceCandidates(
+  a: ThirdPlaceCandidate,
+  b: ThirdPlaceCandidate
+): number {
+  const ar = a.row;
+  const br = b.row;
+  if (br.points !== ar.points) return br.points - ar.points;
+  if (br.goalDiff !== ar.goalDiff) return br.goalDiff - ar.goalDiff;
+  if (br.goalsFor !== ar.goalsFor) return br.goalsFor - ar.goalsFor;
+  const aConduct = teamConductScore(a.row.team);
+  const bConduct = teamConductScore(b.row.team);
+  if (bConduct !== aConduct) return bConduct - aConduct;
+  const aFifa = fifaRankingForTiebreak(a.row.team);
+  const bFifa = fifaRankingForTiebreak(b.row.team);
+  if (aFifa !== bFifa) return aFifa - bFifa;
+  return a.letter.localeCompare(b.letter);
+}
+
+export interface ThirdPlaceTableEntry {
+  rank: number;
+  groupLetter: string;
+  team: Team;
+  points: number;
+  goalDiff: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  qualifies: boolean;
+  bracketSlot: WinnerSlot | null;
+  matchNumber: number | null;
+  faces: string | null;
+}
+
+export interface ThirdPlaceSlotAssignment {
+  matchNumber: number;
+  winnerSlot: WinnerSlot;
+  winnerGroup: string;
+  thirdPlaceGroup: string | null;
+  team: Team | null;
+}
+
+export interface ThirdPlaceTableView {
+  entries: ThirdPlaceTableEntry[];
+  qualifyingCount: number;
+  annexKey: string | null;
+  hasFullCombination: boolean;
+  slotAssignments: ThirdPlaceSlotAssignment[];
+}
+
+function matchNumberForWinnerSlot(slot: WinnerSlot): number {
+  for (const [num, s] of Object.entries(THIRD_PLACE_MATCH_SLOT)) {
+    if (s === slot) return Number(num);
+  }
+  return 0;
+}
+
+export function buildThirdPlaceTable(
+  matches: Match[],
+  groupPickScores: Map<string, PickScore>
+): ThirdPlaceTableView {
+  const groups = computeGroupProjections(matches, groupPickScores);
+  const ranked = rankThirdPlaceTeams(groups);
+  const qualifying = ranked.slice(0, 8);
+  const qualifyingLetters = qualifying.map((c) => c.letter);
+  const annexKey =
+    qualifyingLetters.length > 0
+      ? [...qualifyingLetters].sort().join("")
+      : null;
+  const mapping =
+    qualifyingLetters.length === 8
+      ? lookupThirdPlaceMapping(qualifyingLetters)
+      : null;
+
+  const slotBySourceGroup = new Map<string, WinnerSlot>();
+  if (mapping) {
+    for (const slot of WINNER_SLOTS) {
+      slotBySourceGroup.set(mapping[slot], slot);
+    }
+  }
+
+  const entries: ThirdPlaceTableEntry[] = ranked.map((candidate, index) => {
+    const qualifies = index < 8;
+    const slot = qualifies ? slotBySourceGroup.get(candidate.letter) ?? null : null;
+    const matchNumber = slot ? matchNumberForWinnerSlot(slot) : null;
+    return {
+      rank: index + 1,
+      groupLetter: candidate.letter,
+      team: candidate.row.team,
+      points: candidate.row.points,
+      goalDiff: candidate.row.goalDiff,
+      goalsFor: candidate.row.goalsFor,
+      goalsAgainst: candidate.row.goalsAgainst,
+      qualifies,
+      bracketSlot: slot,
+      matchNumber: matchNumber || null,
+      faces: slot ? `Group ${slot} winner` : null,
+    };
+  });
+
+  const slotAssignments: ThirdPlaceSlotAssignment[] = WINNER_SLOTS.map((slot) => {
+    const thirdPlaceGroup = mapping?.[slot] ?? null;
+    const candidate = thirdPlaceGroup
+      ? qualifying.find((c) => c.letter === thirdPlaceGroup)
+      : null;
+    return {
+      matchNumber: matchNumberForWinnerSlot(slot),
+      winnerSlot: slot,
+      winnerGroup: slot,
+      thirdPlaceGroup,
+      team: candidate?.row.team ?? null,
+    };
+  });
+
+  return {
+    entries,
+    qualifyingCount: Math.min(8, ranked.length),
+    annexKey,
+    hasFullCombination: !!mapping,
+    slotAssignments,
+  };
+}
+
 function rowAtRank(group: GroupProjection | undefined, rank: number): GroupStandingRow | null {
   return group?.rows.find((r) => r.rank === rank) ?? null;
 }
@@ -182,14 +313,7 @@ function rankThirdPlaceTeams(groups: GroupProjection[]): ThirdPlaceCandidate[] {
     if (third) candidates.push({ letter, row: third });
   }
 
-  return candidates.sort((a, b) => {
-    const ar = a.row;
-    const br = b.row;
-    if (br.points !== ar.points) return br.points - ar.points;
-    if (br.goalDiff !== ar.goalDiff) return br.goalDiff - ar.goalDiff;
-    if (br.goalsFor !== ar.goalsFor) return br.goalsFor - ar.goalsFor;
-    return a.letter.localeCompare(b.letter);
-  });
+  return candidates.sort(compareThirdPlaceCandidates);
 }
 
 function lookupThirdPlaceMapping(qualifyingLetters: string[]) {

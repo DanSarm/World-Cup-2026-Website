@@ -9,13 +9,18 @@ import {
   type LeaderboardFilter,
 } from "@/lib/leaderboardFilter";
 import { mergeLeaderboard, useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
-import { PoolHighlightsSection } from "./PoolHighlights";
-import type { PoolHighlights } from "@/lib/poolHighlights";
+import {
+  filterProgressionForPlayers,
+  type LeaderboardProgression,
+} from "@/lib/leaderboardProgression";
+import { LeaderboardProgressionChart } from "./LeaderboardProgressionChart";
 
 interface LeaderboardClientProps {
   leaderboard: LeaderboardEntry[];
   prizePool: number;
-  poolHighlights: PoolHighlights;
+  progression: LeaderboardProgression;
+  paidPlayerIds: string[];
+  currentPlayerId: string;
   pollLive?: boolean;
   initialHasLiveScoring?: boolean;
 }
@@ -23,7 +28,9 @@ interface LeaderboardClientProps {
 export function LeaderboardClient({
   leaderboard: initialLeaderboard,
   prizePool,
-  poolHighlights,
+  progression,
+  paidPlayerIds,
+  currentPlayerId,
   pollLive = false,
   initialHasLiveScoring = false,
 }: LeaderboardClientProps) {
@@ -39,6 +46,20 @@ export function LeaderboardClient({
   const displayedLeaderboard = useMemo(
     () => filterLeaderboard(leaderboard, filter, prizePool),
     [leaderboard, filter, prizePool]
+  );
+
+  const allPlayerIds = useMemo(
+    () => new Set(leaderboard.map((e) => e.playerId)),
+    [leaderboard]
+  );
+
+  const filteredProgression = useMemo(
+    () =>
+      filterProgressionForPlayers(
+        progression,
+        filter === "paid" ? new Set(paidPlayerIds) : allPlayerIds
+      ),
+    [progression, filter, paidPlayerIds, allPlayerIds]
   );
 
   return (
@@ -63,7 +84,13 @@ export function LeaderboardClient({
         hasLiveScoring={hasLiveScoring}
       />
 
-      <PoolHighlightsSection highlights={poolHighlights} />
+      <LeaderboardProgressionChart
+        progression={filteredProgression}
+        variant="pool"
+        size="large"
+        title={filter === "paid" ? "Prize pool points" : "Everyone's points"}
+        highlightPlayerId={currentPlayerId}
+      />
     </div>
   );
 }

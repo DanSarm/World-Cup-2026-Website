@@ -9,7 +9,6 @@ import {
 } from "@/lib/groupStandings";
 import { GROUP_LETTERS, type Match, type MatchPrediction } from "@/lib/types";
 import { hasSavedPick } from "@/lib/pickUtils";
-import { hasActualMatchResult } from "@/lib/matchResults";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 
@@ -27,7 +26,6 @@ export function GroupStandingsPanel({
   highlightGroup,
 }: GroupStandingsPanelProps) {
   const [expanded, setExpanded] = useState(true);
-  const [filter, setFilter] = useState<"all" | "started">("all");
 
   const savedMap = useMemo(() => {
     const map = new Map<string, PickScore>();
@@ -51,34 +49,16 @@ export function GroupStandingsPanel({
     [matches, pickScores]
   );
 
-  const visible = useMemo(
-    () =>
-      filter === "started"
-        ? groups.filter((g) => g.picksApplied > 0)
-        : groups,
-    [groups, filter]
-  );
-
-  const totalPicks = groups.reduce((s, g) => s + g.picksApplied, 0);
-  const totalGroupMatches = groups.reduce((s, g) => s + g.totalMatches, 0);
-  const finalGroupResults = matches.filter(
-    (m) => m.stage === "group" && hasActualMatchResult(m)
-  ).length;
+  const visible = groups;
 
   if (!groups.length) return null;
 
   return (
-    <section className="card space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h2 className="font-bold text-usa text-sm uppercase tracking-wide">
-            Your group picture
-          </h2>
-          <p className="text-xs text-ink-muted leading-snug">
-            Final scores update standings automatically · unplayed games use your
-            picks
-          </p>
-        </div>
+    <section className="card space-y-3 p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-bold text-usa text-sm uppercase tracking-wide">
+          Groups
+        </h2>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -86,34 +66,6 @@ export function GroupStandingsPanel({
         >
           {expanded ? "Hide" : "Show"}
         </button>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="text-ink-muted tabular-nums">
-          {finalGroupResults > 0 && (
-            <span>{finalGroupResults} final · </span>
-          )}
-          {totalPicks}/{totalGroupMatches} picks applied
-        </span>
-        <div className="flex gap-1">
-          {(
-            [
-              { key: "all" as const, label: "All groups" },
-              { key: "started" as const, label: "With picks" },
-            ] as const
-          ).map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={`filter-pill text-[10px] py-1 px-2 ${
-                filter === f.key ? "filter-pill-active" : ""
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {expanded && (
@@ -127,7 +79,7 @@ export function GroupStandingsPanel({
           ))}
           {visible.length === 0 && (
             <p className="text-sm text-ink-muted col-span-full text-center py-4">
-              Pick a group-stage score to see standings here
+              No groups yet
             </p>
           )}
         </div>
@@ -153,9 +105,6 @@ function GroupCard({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-extrabold text-ink">Group {group.letter}</span>
-        <span className="text-[10px] text-ink-faint tabular-nums">
-          {group.picksApplied}/{group.totalMatches}
-        </span>
       </div>
 
       <div className="space-y-1">
@@ -184,10 +133,6 @@ function GroupCard({
           </div>
         ))}
       </div>
-
-      {group.picksApplied === 0 && (
-        <p className="text-[10px] text-ink-faint text-center">No picks yet</p>
-      )}
     </div>
   );
 }

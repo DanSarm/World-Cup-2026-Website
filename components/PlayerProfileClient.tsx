@@ -8,8 +8,8 @@ import { RecentPickFormDots } from "./RecentPickFormDots";
 import { RankMedal } from "./PlaceMedal";
 import { Flag } from "./Flag";
 import { formatMoney } from "@/lib/payouts";
-import { AchievementShowcase } from "./AchievementShowcase";
 import { ProfilePodiumShowcase } from "./ProfilePodiumShowcase";
+import { LeaderboardProgressionChart } from "./LeaderboardProgressionChart";
 
 type PickFilter = "all" | "exact" | "correct" | "miss";
 
@@ -202,14 +202,9 @@ export function PlayerProfileClient({
                   {profile.picksMade} picks ·{" "}
                 </>
               )}
-              {profile.exactScores} exact · {profile.correctResults} correct
-              results
-              {profile.perfectDays > 0 && (
-                <span className="text-mexico font-semibold">
-                  {" "}
-                  · Perfect Day{profile.perfectDays > 1 ? ` ×${profile.perfectDays}` : ""} 🎉
-                </span>
-              )}
+              {profile.pickStats.exact} exact ·{" "}
+              {profile.pickStats.exact + profile.pickStats.correct} correct ·{" "}
+              {profile.pickStats.wrong} wrong
             </p>
             <RecentPickFormDots
               form={profile.recentForm ?? []}
@@ -237,7 +232,12 @@ export function PlayerProfileClient({
         </div>
       </header>
 
-      <AchievementShowcase achievements={profile.achievements} />
+      <LeaderboardProgressionChart
+        progression={profile.leaderboardProgression}
+        variant="profile"
+        highlightPlayerId={profile.playerId}
+        title={`${profile.displayName.split(" ")[0] ?? profile.displayName}'s standings`}
+      />
 
       {profile.podiumPicks && (
         <ProfilePodiumShowcase

@@ -36,6 +36,11 @@ import type {
 import { canPickMatch } from "./utils";
 import { getStageLabel } from "./types";
 import { syncLiveScores } from "./scores/sync";
+import { computePlayerPickStats, type PlayerPickStats } from "./playerPickStats";
+import {
+  buildLeaderboardProgression,
+  type LeaderboardProgression,
+} from "./leaderboardProgression";
 
 export type AchievementTier = "legendary" | "gold" | "silver" | "bronze";
 
@@ -123,6 +128,8 @@ export interface PlayerProfileData {
   picksMade: number;
   exactScores: number;
   correctResults: number;
+  pickStats: PlayerPickStats;
+  leaderboardProgression: LeaderboardProgression;
   hasLiveScoring: boolean;
 }
 
@@ -574,6 +581,19 @@ export async function getPlayerProfileData(
         return match != null && canRevealOtherPlayersPicks(match);
       });
 
+  const pickStats = computePlayerPickStats(picks);
+  const leaderboardProgression = buildLeaderboardProgression(
+    players,
+    matches,
+    allPredictions,
+    podiumPredictions,
+    finalsPredictions,
+    adjustments,
+    settings,
+    actualResults,
+    teams
+  );
+
   const pointsBreakdown: PlayerPointsBreakdown = {
     matchPoints: entry.matchPoints,
     groupStagePoints: entry.groupStagePoints,
@@ -614,6 +634,8 @@ export async function getPlayerProfileData(
     picksMade: entry.picksMade,
     exactScores: entry.exactScores,
     correctResults: entry.correctResults,
+    pickStats,
+    leaderboardProgression,
     hasLiveScoring: leaderboardBundle.hasLiveScoring,
   };
 }

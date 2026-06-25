@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { TeamFlag } from "./Flag";
 import { TeamCode } from "./TeamCode";
 import { tournamentPlacePoints } from "@/lib/tournamentValue";
@@ -14,28 +17,74 @@ function formatWinChance(probability: number): string {
   return "<1%";
 }
 
+function CollapseChevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`w-4 h-4 shrink-0 text-ink-faint transition-transform duration-200 ${
+        expanded ? "rotate-180" : ""
+      }`}
+      aria-hidden
+    >
+      <path
+        fill="currentColor"
+        d="M4.5 6.25 8 9.75l3.5-3.5.708.708L8 11.167 3.792 6.958z"
+      />
+    </svg>
+  );
+}
+
 export function ChampionOddsPanel({ entries, sourceLabel }: ChampionOddsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
   const withOdds = entries.filter((entry) => entry.impliedProbability != null);
+
+  const summary =
+    withOdds.length > 0
+      ? `${withOdds.length} teams · ${sourceLabel ?? "market win %"}`
+      : sourceLabel ?? "Winner odds from the market";
+
+  const listClassName = expanded
+    ? "flex flex-col flex-1 min-h-0 overflow-y-auto podium-odds-scroll"
+    : "hidden xl:flex xl:flex-col flex-1 min-h-0 overflow-y-auto podium-odds-scroll";
+
+  const emptyClassName = expanded
+    ? "text-sm text-ink-faint text-center px-4 py-8 leading-snug"
+    : "hidden xl:block text-sm text-ink-faint text-center px-4 py-8 leading-snug";
 
   return (
     <aside className="card p-0 overflow-hidden flex flex-col h-full max-h-full min-h-0 w-full">
-      <div className="px-4 py-3 border-b border-ink/5 bg-cream/30 shrink-0">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        className={`xl:hidden w-full text-left px-4 py-3 bg-cream/30 shrink-0 hover:bg-cream/50 transition-colors ${
+          expanded ? "border-b border-ink/5" : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
+              To win it all
+            </h2>
+            <p className="text-[11px] text-ink-muted mt-0.5 leading-snug">
+              {expanded ? summary : `${summary} · Tap to expand`}
+            </p>
+          </div>
+          <CollapseChevron expanded={expanded} />
+        </div>
+      </button>
+
+      <div className="hidden xl:block px-4 py-3 border-b border-ink/5 bg-cream/30 shrink-0">
         <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
           To win it all
         </h2>
-        <p className="text-[11px] text-ink-muted mt-0.5 leading-snug">
-          {withOdds.length > 0
-            ? `${withOdds.length} teams · ${sourceLabel ?? "market win %"}`
-            : sourceLabel ?? "Winner odds from the market"}
-        </p>
+        <p className="text-[11px] text-ink-muted mt-0.5 leading-snug">{summary}</p>
       </div>
 
       {withOdds.length === 0 ? (
-        <p className="text-sm text-ink-faint text-center px-4 py-8 leading-snug">
-          Winner odds aren&apos;t available yet
-        </p>
+        <p className={emptyClassName}>Winner odds aren&apos;t available yet</p>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto podium-odds-scroll">
+        <div className={listClassName}>
           <ol className="divide-y divide-ink/5">
             {entries.map((entry, index) => {
               const championPts = tournamentPlacePoints(entry.team, "champion");

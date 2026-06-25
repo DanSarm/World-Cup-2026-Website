@@ -1,15 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
-import {
-  getLeaderboardData,
-  getPredictions,
-  getTournamentPodiumPredictions,
-  getFinalsPredictions,
-  getAdjustments,
-  getActualResults,
-  getTeams,
-} from "@/lib/data";
-import { computePoolHighlights } from "@/lib/poolHighlights";
+import { getLeaderboardData, getPredictions, getTournamentPodiumPredictions, getFinalsPredictions, getAdjustments, getActualResults, getTeams } from "@/lib/data";
+import { buildLeaderboardProgression } from "@/lib/leaderboardProgression";
 import { calculatePrizePool } from "@/lib/payouts";
 import { LeaderboardClient } from "@/components/LeaderboardClient";
 import {
@@ -39,27 +31,29 @@ export default async function LeaderboardPage() {
     getTeams(),
   ]);
 
-  const poolHighlights = computePoolHighlights({
+  const progression = buildLeaderboardProgression(
     players,
     matches,
     predictions,
-    settings,
-    leaderboard,
     podiumPredictions,
     finalsPredictions,
     adjustments,
+    settings,
     actualResults,
-    teams,
-  });
+    teams
+  );
 
-  const paidCount = players.filter((p) => p.paid).length;
+  const paidPlayerIds = players.filter((p) => p.paid).map((p) => p.id);
+  const paidCount = paidPlayerIds.length;
   const prizePool = calculatePrizePool(paidCount);
 
   return (
     <LeaderboardClient
       leaderboard={leaderboard}
       prizePool={prizePool}
-      poolHighlights={poolHighlights}
+      progression={progression}
+      paidPlayerIds={paidPlayerIds}
+      currentPlayerId={session.id}
       pollLive={isAnyMatchNeedingScoreSync(matches)}
       initialHasLiveScoring={hasAnyDisplayableLiveScore(matches)}
     />

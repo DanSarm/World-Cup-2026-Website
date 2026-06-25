@@ -33,9 +33,8 @@ export default async function HomePage() {
   const scoringConfig = scoringConfigFromSettings(settings);
   const predMap = new Map(predictions.map((p) => [p.match_id, p]));
   const liveMatches = findCurrentlyPlayingMatches(matches);
-  const featuredLiveMatches = liveMatches.slice(0, 1);
   const liveMatchIds = new Set(liveMatches.map((m) => m.id));
-  const upcomingLimit = featuredLiveMatches.length > 0 ? 1 : 2;
+  const upcomingLimit = liveMatches.length > 0 ? 1 : 2;
   const upcomingMatches = findNextUpcomingMatches(
     matches,
     upcomingLimit,
@@ -45,7 +44,7 @@ export default async function HomePage() {
   const podiumLocked = isTournamentPodiumLocked(settings, matches);
 
   const matchIdsToLoad = [
-    ...featuredLiveMatches.map((m) => m.id),
+    ...liveMatches.map((m) => m.id),
     ...upcomingMatches.map((m) => m.id),
   ];
   const communityPicksByMatchId = new Map(
@@ -83,7 +82,7 @@ export default async function HomePage() {
         championProbabilities={settings.champion_probabilities}
       />
 
-      {featuredLiveMatches.map((match) => (
+      {liveMatches.map((match) => (
         <HomeFeaturedMatchSection
           key={match.id}
           match={match}
@@ -119,7 +118,7 @@ export default async function HomePage() {
         />
       ))}
 
-      {featuredLiveMatches.length === 0 && upcomingMatches.length === 0 && (
+      {liveMatches.length === 0 && upcomingMatches.length === 0 && (
         <AllPicksDoneHero />
       )}
 

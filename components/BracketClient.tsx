@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { PageHeader } from "./PageHeader";
 import { GroupStandingsPanel } from "./GroupStandingsPanel";
+import { ThirdPlaceTablePanel } from "./ThirdPlaceTablePanel";
 import { KnockoutBracketPanel } from "./KnockoutBracketPanel";
 import { mergeMatchScoreUpdates } from "@/lib/matchLive";
 import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
@@ -33,17 +34,17 @@ export function BracketClient({
       <PageHeader
         flags={["USA", "MEX", "CAN", "BRA"]}
         title="Bracket"
-        subtitle="Real results where games have finished · your picks fill in the rest"
       />
 
       {hasGroupStage ? (
         <>
           <GroupStandingsPanel matches={matches} predictions={predictions} />
+          <ThirdPlaceTablePanel matches={matches} predictions={predictions} />
           <KnockoutBracketPanel matches={matches} predictions={predictions} />
         </>
       ) : (
         <div className="card text-center py-10 text-ink-muted text-sm">
-          Group-stage matches aren&apos;t available yet
+          Coming soon
         </div>
       )}
     </div>

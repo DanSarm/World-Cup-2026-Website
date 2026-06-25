@@ -60,42 +60,22 @@ export function KnockoutBracketPanel({
 
   return (
     <section className="w-full space-y-3">
-      <div className="card space-y-3 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h2 className="font-bold text-usa text-sm uppercase tracking-wide">
-              Knockout bracket
-            </h2>
-            <p className="text-xs text-ink-muted leading-snug">
-              Real scores advance teams when games finish · your knockout picks
-              fill in games still to play
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-xs font-semibold text-ink-faint hover:text-ink shrink-0"
-          >
-            {expanded ? "Hide" : "Show"}
-          </button>
-        </div>
-
-        {bracket.qualifyingThirdGroups.length > 0 && (
-          <p className="text-[10px] text-ink-faint">
-            Best third-place groups:{" "}
-            <span className="font-semibold text-ink-muted">
-              {bracket.qualifyingThirdGroups.join(", ")}
-            </span>
-          </p>
-        )}
+      <div className="card flex items-center justify-between gap-3 p-4 sm:p-5">
+        <h2 className="font-bold text-usa text-sm uppercase tracking-wide">
+          Knockout
+        </h2>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs font-semibold text-ink-faint hover:text-ink shrink-0"
+        >
+          {expanded ? "Hide" : "Show"}
+        </button>
       </div>
 
       {expanded && (
         <div className="full-bleed">
-          <p className="text-[10px] text-white/50 text-center mb-2 md:hidden">
-            Swipe sideways to see the full bracket
-          </p>
-          <div className="knockout-bracket-scroll overflow-x-auto pb-2">
+          <div className="knockout-bracket-scroll overflow-x-auto pb-3">
             <div className="bracket-tree">
               <BracketHalf
                 side="left"
@@ -292,7 +272,7 @@ function BracketTeamRow({
   if (slot.team) {
     return (
       <div
-        className={`flex items-center gap-1 px-1.5 py-1 min-h-[28px] ${
+        className={`flex items-center gap-1 px-1.5 py-1.5 min-h-[32px] ${
           isWinner ? "bg-gold/10 font-semibold" : ""
         }`}
       >
@@ -313,7 +293,7 @@ function BracketTeamRow({
   }
 
   return (
-    <div className="flex items-center gap-1 px-1.5 py-1 min-h-[28px]">
+    <div className="flex items-center gap-1 px-1.5 py-1.5 min-h-[32px]">
       <span className="w-5 h-[15px] rounded-sm bg-ink/5 inline-flex items-center justify-center text-[9px] text-ink-faint">
         ?
       </span>
