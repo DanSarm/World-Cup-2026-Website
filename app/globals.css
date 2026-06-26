@@ -100,6 +100,164 @@ body {
   color: var(--color-ink);
 }
 
+/* ── Picks page: knockout round accents (structure unchanged) ── */
+.pick-card--r32,
+.pick-card--r16,
+.pick-card--qf,
+.pick-card--sf,
+.pick-card--third,
+.pick-card--final {
+  @apply relative overflow-hidden;
+}
+
+.pick-card--r32 {
+  border-left: 3px solid #38bdf8;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgb(56 189 248 / 0.12);
+}
+
+.pick-card--r16 {
+  border-left: 3px solid var(--color-mexico-light);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgb(0 135 81 / 0.1);
+}
+
+.pick-card--qf {
+  border-left: 3px solid var(--color-gold);
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgb(212 175 55 / 0.14);
+}
+
+.pick-card--sf {
+  border-left: 3px solid var(--color-usa);
+  box-shadow:
+    var(--shadow-card),
+    inset 3px 0 0 var(--color-gold),
+    inset 0 1px 0 rgb(0 40 104 / 0.08);
+}
+
+.pick-card--third {
+  border-left: 3px solid #b87333;
+  box-shadow: var(--shadow-card), inset 0 1px 0 rgb(184 115 51 / 0.12);
+}
+
+.pick-card--final {
+  border: 1px solid rgb(212 175 55 / 0.45);
+  border-left: 3px solid var(--color-gold-dark);
+  box-shadow: var(--shadow-card), var(--shadow-glow-gold);
+}
+
+.pick-card--r32::before,
+.pick-card--r16::before,
+.pick-card--qf::before,
+.pick-card--sf::before,
+.pick-card--third::before,
+.pick-card--final::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2.75rem;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.pick-card--r32::before {
+  background: linear-gradient(180deg, rgb(56 189 248 / 0.09) 0%, transparent 100%);
+}
+
+.pick-card--r16::before {
+  background: linear-gradient(180deg, rgb(0 135 81 / 0.08) 0%, transparent 100%);
+}
+
+.pick-card--qf::before {
+  background: linear-gradient(180deg, rgb(212 175 55 / 0.1) 0%, transparent 100%);
+}
+
+.pick-card--sf::before {
+  background: linear-gradient(135deg, rgb(0 40 104 / 0.07) 0%, rgb(212 175 55 / 0.06) 100%);
+}
+
+.pick-card--third::before {
+  background: linear-gradient(180deg, rgb(184 115 51 / 0.09) 0%, transparent 100%);
+}
+
+.pick-card--final::before {
+  background: linear-gradient(
+    180deg,
+    rgb(240 203 95 / 0.16) 0%,
+    rgb(212 175 55 / 0.05) 45%,
+    transparent 100%
+  );
+}
+
+.pick-card-ribbon {
+  @apply relative z-[1] flex items-center gap-2 px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em];
+  border-bottom: 1px solid rgb(0 0 0 / 0.05);
+}
+
+.pick-card-ribbon::before {
+  content: "";
+  @apply w-1.5 h-1.5 rounded-full shrink-0;
+}
+
+.pick-card-ribbon--r32 {
+  color: #0369a1;
+  background: rgb(56 189 248 / 0.1);
+}
+
+.pick-card-ribbon--r32::before {
+  background: #38bdf8;
+}
+
+.pick-card-ribbon--r16 {
+  color: var(--color-mexico);
+  background: rgb(0 135 81 / 0.09);
+}
+
+.pick-card-ribbon--r16::before {
+  background: var(--color-mexico-light);
+}
+
+.pick-card-ribbon--qf {
+  color: var(--color-gold-dark);
+  background: rgb(212 175 55 / 0.12);
+}
+
+.pick-card-ribbon--qf::before {
+  background: var(--color-gold);
+}
+
+.pick-card-ribbon--sf {
+  color: var(--color-usa);
+  background: linear-gradient(90deg, rgb(0 40 104 / 0.08) 0%, rgb(212 175 55 / 0.1) 100%);
+}
+
+.pick-card-ribbon--sf::before {
+  background: linear-gradient(135deg, var(--color-usa) 50%, var(--color-gold) 50%);
+}
+
+.pick-card-ribbon--third {
+  color: #8b5a2b;
+  background: rgb(184 115 51 / 0.1);
+}
+
+.pick-card-ribbon--third::before {
+  background: #b87333;
+}
+
+.pick-card-ribbon--final {
+  color: var(--color-gold-dark);
+  background: linear-gradient(
+    90deg,
+    rgb(168 137 42 / 0.14) 0%,
+    rgb(240 203 95 / 0.2) 50%,
+    rgb(168 137 42 / 0.14) 100%
+  );
+  letter-spacing: 0.18em;
+}
+
+.pick-card-ribbon--final::before {
+  background: var(--color-gold);
+  box-shadow: 0 0 6px rgb(212 175 55 / 0.65);
+}
+
 .card-highlight {
   @apply relative overflow-hidden rounded-2xl p-5;
   background: linear-gradient(135deg, #fffef8 0%, var(--color-white) 50%, #f8faf5 100%);

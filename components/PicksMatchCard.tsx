@@ -13,6 +13,7 @@ import {
   isMatchLive,
 } from "@/lib/matchLive";
 import { canRevealOtherPlayersPicks } from "@/lib/pickVisibility";
+import { KnockoutRoundCardShell } from "./KnockoutRoundCardShell";
 
 interface PicksMatchCardProps {
   match: Match;
@@ -72,7 +73,7 @@ export function PicksMatchCard({
   }, [picks, picksRevealed, showingLiveScore, isLive, matchDecided]);
 
   return (
-    <div className="card p-0 overflow-hidden h-fit w-full">
+    <KnockoutRoundCardShell match={match} className="card p-0 overflow-hidden h-fit w-full">
       <MatchCard
         match={match}
         prediction={prediction}
@@ -94,6 +95,6 @@ export function PicksMatchCard({
         totalPlayers={totalPlayers}
         predictedCount={predictedCount}
       />
-    </div>
+    </KnockoutRoundCardShell>
   );
 }

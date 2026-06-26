@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CommunityMatchPick } from "@/lib/types";
 import { isAnyMatchNeedingScoreSync } from "@/lib/matchLive";
+import { isMatchMissingDisplayOdds } from "@/lib/matchOdds";
 import type { PickReminderPayload, PickScheduleItem } from "@/lib/pickReminders";
 import type { Match, MatchPrediction } from "@/lib/types";
 
@@ -11,6 +12,9 @@ const LIVE_POLL_INTERVAL_MS = Number(
 );
 const IDLE_POLL_INTERVAL_MS = Number(
   process.env.NEXT_PUBLIC_PICKS_POLL_INTERVAL_MS ?? "45000"
+);
+const ODDS_POLL_INTERVAL_MS = Number(
+  process.env.NEXT_PUBLIC_ODDS_POLL_INTERVAL_MS ?? "30000"
 );
 
 export interface PicksSnapshotPayload {
@@ -55,7 +59,12 @@ export function usePicksRefresh(enabled = true) {
   const liveActive = data?.matches?.length
     ? isAnyMatchNeedingScoreSync(data.matches)
     : true;
-  const pollIntervalMs = liveActive ? LIVE_POLL_INTERVAL_MS : IDLE_POLL_INTERVAL_MS;
+  const oddsPending = data?.matches?.some(isMatchMissingDisplayOdds) ?? false;
+  const pollIntervalMs = liveActive
+    ? LIVE_POLL_INTERVAL_MS
+    : oddsPending
+      ? ODDS_POLL_INTERVAL_MS
+      : IDLE_POLL_INTERVAL_MS;
 
   useEffect(() => {
     mountedRef.current = true;

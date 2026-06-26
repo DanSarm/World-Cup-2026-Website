@@ -14,12 +14,13 @@ import { getWorldCupKickoff, isTournamentPodiumLocked } from "@/lib/utils";
 import { resolveMatchesForPicks } from "@/lib/resolvedMatches";
 import { filterCommunityPicksByMatchForViewer } from "@/lib/pickVisibility";
 import { PicksClient } from "@/components/PicksClient";
+import { maybeSyncUpcomingOdds } from "@/lib/odds/sync";
 
 export default async function PicksPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [matches, settings, teams, myPodium, players] = await Promise.all([
+  let [matches, settings, teams, myPodium, players] = await Promise.all([
     getMatchesWithTeams(),
     getSettings(),
     getTeams(),
@@ -27,13 +28,17 @@ export default async function PicksPage() {
     getPlayers(),
   ]);
 
+  let pickMatches = resolveMatchesForPicks(matches);
+  await maybeSyncUpcomingOdds(pickMatches);
+  matches = await getMatchesWithTeams();
+  pickMatches = resolveMatchesForPicks(matches);
+
   const predictions = await getPredictions(session.id);
 
   const scoringConfig = scoringConfigFromSettings(settings);
   const podiumLocked = isTournamentPodiumLocked(settings, matches);
   const worldCupKickoff = getWorldCupKickoff(matches);
 
-  const pickMatches = resolveMatchesForPicks(matches);
   const communityPicksRaw = await getConfirmedMatchPicksByMatchIds(
     pickMatches.map((m) => m.id)
   );

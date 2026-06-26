@@ -4,11 +4,28 @@ import type { Match, OddsStatus, Team } from "@/lib/types";
 import { isKnockoutStage } from "@/lib/types";
 import { getOddsConfig } from "./config";
 import { validateOddsSchema } from "./schemaCheck";
+import { canSyncMatchOdds, minOddsSyncIntervalMs } from "./quotaGuard";
+import { isMatchMissingDisplayOdds } from "@/lib/matchOdds";
+import {
+  buildEspnOddsUpdate,
+  canSyncEspnOdds,
+  fetchEspnWorldCupOddsFixtures,
+  markEspnOddsSynced,
+  matchEspnOddsToFixture,
+  scoreboardDatesForOddsMatches,
+} from "./espnMatchOdds";
+import {
+  buildPolymarketOddsUpdate,
+  canSyncPolymarketOdds,
+  fetchPolymarketMatchOdds,
+  markPolymarketOddsSynced,
+} from "./polymarketMatchOdds";
 import {
   fetchUpcomingOdds,
   matchOddsEventToFixture,
   processAdvanceOdds,
   processH2hOdds,
+  processKnockoutOddsFromH2h,
   type OddsApiEvent,
 } from "./theOddsApi";
 
@@ -54,6 +71,23 @@ async function loadMatchWithTeams(matchId: string): Promise<Match | null> {
     .eq("id", matchId)
     .maybeSingle();
   return (data as Match | null) ?? null;
+}
+
+async function loadMatchesByIds(matchIds: string[]): Promise<Match[]> {
+  if (!matchIds.length) return [];
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("matches")
+    .select(
+      "*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)"
+    )
+    .in("id", matchIds)
+    .order("match_number");
+  return (data ?? []) as Match[];
+}
+
+function usePaidMatchOdds(): boolean {
+  return process.env.ODDS_USE_PAID_MATCH_ODDS === "true";
 }
 
 async function replaceSnapshots(
@@ -189,7 +223,9 @@ export async function syncOddsForMatch(
         away_win_bonus: h2h.awayBonus,
       });
     } else {
-      const advance = processAdvanceOdds(event, matchId, homeTeam, awayTeam, provider);
+      const advance =
+        processAdvanceOdds(event, matchId, homeTeam, awayTeam, provider) ??
+        processKnockoutOddsFromH2h(event, matchId, homeTeam, awayTeam, provider);
       if (advance) {
         bookmakerCount = advance.bookmakerCount;
         snapshots = advance.snapshots;
@@ -200,7 +236,7 @@ export async function syncOddsForMatch(
           away_advance_bonus: advance.awayAdvanceBonus,
         });
       } else {
-        update.odds_source_note = `${provider} · advance market unavailable — set bonuses manually`;
+        update.odds_source_note = `${provider} · knockout odds unavailable — set bonuses manually`;
       }
     }
 
@@ -246,6 +282,273 @@ export async function syncOddsForMatch(
 export interface SyncUpcomingOptions {
   actorId?: string | null;
   skipSchemaCheck?: boolean;
+  /** Bypass throttle — admin manual sync. */
+  force?: boolean;
+  /** Shorter min interval when fixtures are missing percentages. */
+  urgent?: boolean;
+}
+
+/** Whether a fixture should be included in the next automatic odds refresh. */
+export function matchNeedsOddsSync(match: Match): boolean {
+  if (match.status !== "scheduled") return false;
+  if (!match.home_team_id || !match.away_team_id) return false;
+  if (match.odds_status === "manual") return false;
+  if (isOddsLockedForMatch(match)) return false;
+  if (isMatchMissingDisplayOdds(match)) return true;
+  if (!match.odds_last_synced_at) return true;
+
+  const staleMs = minOddsSyncIntervalMs();
+  return Date.now() - new Date(match.odds_last_synced_at).getTime() > staleMs;
+}
+
+export interface MaybeSyncOddsResult {
+  synced: boolean;
+  reason?: string;
+  result?: SyncUpcomingResult;
+}
+
+/** Background odds refresh for visible picks — free sources first, no live-score impact. */
+export async function maybeSyncUpcomingOdds(
+  matches: Match[]
+): Promise<MaybeSyncOddsResult> {
+  const needsSync = matches.filter(matchNeedsOddsSync);
+  if (!needsSync.length) {
+    return { synced: false, reason: "none needed" };
+  }
+
+  const urgent = needsSync.some(isMatchMissingDisplayOdds);
+  let combined: SyncUpcomingResult | undefined;
+  let synced = false;
+
+  const polymarketResult = await syncOddsFromPolymarketForMatches(needsSync, { urgent });
+  if (polymarketResult.synced > 0) {
+    synced = true;
+    combined = polymarketResult;
+  }
+
+  let refreshed = await loadMatchesByIds(needsSync.map((m) => m.id));
+  let stillNeeding = refreshed.filter(matchNeedsOddsSync);
+
+  const espnResult = await syncOddsFromEspnForMatches(stillNeeding, { urgent });
+  if (espnResult.synced > 0) {
+    synced = true;
+    combined = combined
+      ? {
+          ...combined,
+          synced: combined.synced + espnResult.synced,
+          results: [...combined.results, ...espnResult.results],
+        }
+      : espnResult;
+  }
+
+  if (usePaidMatchOdds()) {
+    refreshed = await loadMatchesByIds(needsSync.map((m) => m.id));
+    stillNeeding = refreshed.filter(matchNeedsOddsSync);
+    if (stillNeeding.length) {
+      const oddsApiGuard = await canSyncMatchOdds(1, urgent);
+      if (oddsApiGuard.ok) {
+        const paidResult = await syncOddsForUpcomingMatches({
+          skipSchemaCheck: true,
+          urgent,
+        });
+        if (paidResult.synced > 0) {
+          synced = true;
+          combined = combined
+            ? {
+                ...combined,
+                synced: combined.synced + paidResult.synced,
+                results: [...combined.results, ...paidResult.results],
+              }
+            : paidResult;
+        }
+      }
+    }
+  }
+
+  return {
+    synced,
+    reason: combined?.schemaError,
+    result: combined,
+  };
+}
+
+/** Free Polymarket match moneyline — primary source for match win percentages. */
+export async function syncOddsFromPolymarketForMatches(
+  matches: Match[],
+  options: { force?: boolean; urgent?: boolean } = {}
+): Promise<SyncUpcomingResult> {
+  const result: SyncUpcomingResult = {
+    synced: 0,
+    skipped: 0,
+    failed: 0,
+    locked: 0,
+    needsManual: 0,
+    results: [],
+  };
+
+  const eligible = matches.filter((match) => {
+    if (!matchNeedsOddsSync(match)) return false;
+    return isMatchMissingDisplayOdds(match) || options.force;
+  });
+  if (!eligible.length) return result;
+
+  const guard = await canSyncPolymarketOdds(options.force, options.urgent);
+  if (!guard.ok) {
+    return { ...result, schemaError: guard.reason };
+  }
+
+  for (const match of eligible) {
+    if (match.odds_status === "manual") {
+      result.skipped++;
+      result.results.push({ matchId: match.id, status: "skipped", message: "Manual odds" });
+      continue;
+    }
+
+    if (isOddsLockedForMatch(match)) {
+      result.locked++;
+      result.results.push({ matchId: match.id, status: "locked" });
+      continue;
+    }
+
+    if (!match.home_team || !match.away_team || !match.kickoff_at) {
+      result.skipped++;
+      result.results.push({ matchId: match.id, status: "skipped", message: "Teams not set" });
+      continue;
+    }
+
+    try {
+      const fetched = await fetchPolymarketMatchOdds(match);
+      if (!fetched) {
+        result.needsManual++;
+        result.results.push({
+          matchId: match.id,
+          status: "needs_manual",
+          message: "No Polymarket match market",
+        });
+        continue;
+      }
+
+      const update = buildPolymarketOddsUpdate(match, fetched.probabilities);
+      await updateMatch(match.id, update);
+      result.synced++;
+      result.results.push({
+        matchId: match.id,
+        status: "synced",
+        message: `Synced from Polymarket (${fetched.event.slug ?? "search"})`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Polymarket odds sync failed";
+      result.failed++;
+      result.results.push({ matchId: match.id, status: "failed", message });
+    }
+  }
+
+  if (result.synced > 0) {
+    await markPolymarketOddsSynced();
+  }
+
+  return result;
+}
+
+/** Free ESPN/DraftKings moneyline fallback when The Odds API is unavailable. */
+export async function syncOddsFromEspnForMatches(
+  matches: Match[],
+  options: { force?: boolean; urgent?: boolean } = {}
+): Promise<SyncUpcomingResult> {
+  const result: SyncUpcomingResult = {
+    synced: 0,
+    skipped: 0,
+    failed: 0,
+    locked: 0,
+    needsManual: 0,
+    results: [],
+  };
+
+  const eligible = matches.filter((match) => {
+    if (!matchNeedsOddsSync(match)) return false;
+    return isMatchMissingDisplayOdds(match) || options.force;
+  });
+  if (!eligible.length) {
+    return result;
+  }
+
+  const guard = await canSyncEspnOdds(options.force, options.urgent);
+  if (!guard.ok) {
+    return { ...result, schemaError: guard.reason };
+  }
+
+  const dates = scoreboardDatesForOddsMatches(eligible);
+  if (!dates.length) {
+    return result;
+  }
+
+  let fixtures;
+  try {
+    fixtures = await fetchEspnWorldCupOddsFixtures(dates);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "ESPN odds fetch failed";
+    return { ...result, schemaError: message };
+  }
+
+  if (!fixtures.length) {
+    return result;
+  }
+
+  for (const match of eligible) {
+    if (match.odds_status === "manual") {
+      result.skipped++;
+      result.results.push({ matchId: match.id, status: "skipped", message: "Manual odds" });
+      continue;
+    }
+
+    if (isOddsLockedForMatch(match)) {
+      result.locked++;
+      result.results.push({ matchId: match.id, status: "locked" });
+      continue;
+    }
+
+    const fixture = matchEspnOddsToFixture(fixtures, match);
+    if (!fixture?.moneyline) {
+      result.needsManual++;
+      result.results.push({
+        matchId: match.id,
+        status: "needs_manual",
+        message: "No ESPN moneyline for fixture",
+      });
+      continue;
+    }
+
+    const update = buildEspnOddsUpdate(match, fixture);
+    if (!update) {
+      result.failed++;
+      result.results.push({
+        matchId: match.id,
+        status: "failed",
+        message: "Could not parse ESPN moneyline",
+      });
+      continue;
+    }
+
+    try {
+      await updateMatch(match.id, update);
+      result.synced++;
+      result.results.push({
+        matchId: match.id,
+        status: "synced",
+        message: "Synced from ESPN moneyline",
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "ESPN odds update failed";
+      result.failed++;
+      result.results.push({ matchId: match.id, status: "failed", message });
+    }
+  }
+
+  if (result.synced > 0) {
+    await markEspnOddsSynced();
+  }
+
+  return result;
 }
 
 /** Sync odds for all eligible upcoming matches. */
@@ -268,6 +571,21 @@ export async function syncOddsForUpcomingMatches(
         needsManual: 0,
         results: [],
         schemaError: schema.error,
+      };
+    }
+  }
+
+  if (!options.force) {
+    const guard = await canSyncMatchOdds(1, options.urgent);
+    if (!guard.ok) {
+      return {
+        synced: 0,
+        skipped: 0,
+        failed: 0,
+        locked: 0,
+        needsManual: 0,
+        results: [],
+        schemaError: guard.reason,
       };
     }
   }
@@ -307,11 +625,23 @@ export async function syncOddsForUpcomingMatches(
     return {
       synced: 0,
       skipped: 0,
-      failed: (matches ?? []).length,
+      failed: 0,
       locked: 0,
       needsManual: 0,
       results: [],
       schemaError: message,
+    };
+  }
+
+  if (!events.length) {
+    return {
+      synced: 0,
+      skipped: 0,
+      failed: 0,
+      locked: 0,
+      needsManual: 0,
+      results: [],
+      schemaError: "odds api unavailable",
     };
   }
 

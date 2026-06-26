@@ -10,6 +10,14 @@ export function hasMatchOdds(match: Match): boolean {
   return getMatchOddsSegments(match) != null;
 }
 
+/** True when a scheduled fixture has teams but no user-facing win percentages yet. */
+export function isMatchMissingDisplayOdds(match: Match): boolean {
+  if (match.status !== "scheduled") return false;
+  if (!match.home_team_id || !match.away_team_id) return false;
+  if (match.odds_status === "manual" || match.odds_status === "locked") return false;
+  return !hasMatchOdds(match);
+}
+
 export interface OddsSegment {
   key: "home" | "draw" | "away";
   label: string;
@@ -84,7 +92,7 @@ function buildSegments(
 /** User-facing win-chance segments (percentages, not decimal odds). */
 export function getMatchOddsSegments(match: Match): OddsSegment[] | null {
   if (isKnockoutStage(match.stage)) {
-    return buildSegments([
+    const advance = buildSegments([
       {
         key: "home",
         label: teamCodeLabel(match, "home"),
@@ -102,6 +110,35 @@ export function getMatchOddsSegments(match: Match): OddsSegment[] | null {
         textClass: "text-odds-away",
       },
     ]);
+    if (advance) return advance;
+
+    const homeImplied = parseProb(match.home_implied_probability);
+    const awayImplied = parseProb(match.away_implied_probability);
+    if (homeImplied != null && awayImplied != null) {
+      const total = homeImplied + awayImplied;
+      if (total > 0) {
+        return buildSegments([
+          {
+            key: "home",
+            label: teamCodeLabel(match, "home"),
+            prob: homeImplied / total,
+            barClass: "bg-odds-home",
+            dotClass: "bg-odds-home",
+            textClass: "text-odds-home",
+          },
+          {
+            key: "away",
+            label: teamCodeLabel(match, "away"),
+            prob: awayImplied / total,
+            barClass: "bg-odds-away",
+            dotClass: "bg-odds-away",
+            textClass: "text-odds-away",
+          },
+        ]);
+      }
+    }
+
+    return null;
   }
 
   return buildSegments([

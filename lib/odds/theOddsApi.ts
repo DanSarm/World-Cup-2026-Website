@@ -7,7 +7,7 @@
 import type { Match, Team } from "@/lib/types";
 import { isKnockoutStage } from "@/lib/types";
 import { getOddsConfig, isOddsApiConfigured } from "./config";
-import { recordOddsApiUsage } from "./quotaGuard";
+import { recordMatchOddsSync, recordOddsApiUsage } from "./quotaGuard";
 import {
   average,
   calculateNoVigProbabilities,
@@ -108,8 +108,15 @@ export async function fetchUpcomingOdds(): Promise<OddsApiEvent[]> {
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    if (isOddsQuotaExceeded(res.status, body)) {
+      await recordMatchOddsSync(1, 0);
+      return [];
+    }
     throw new Error(`Odds API error ${res.status}: ${body.slice(0, 200)}`);
   }
+
+  const creditsRemaining = parseCreditsRemaining(res);
+  await recordMatchOddsSync(1, creditsRemaining);
 
   return (await res.json()) as OddsApiEvent[];
 }
@@ -427,6 +434,116 @@ export function processAdvanceOdds(
           normalized_probability: row.norm,
         });
       }
+    }
+  }
+
+  if (!homeNoVigs.length) return null;
+
+  const homeAdvanceImplied = average(homeNoVigs);
+  const awayAdvanceImplied = average(awayNoVigs);
+
+  return {
+    homeAdvanceImplied,
+    awayAdvanceImplied,
+    homeAdvanceBonus: probabilityToBonus(homeAdvanceImplied),
+    awayAdvanceBonus: probabilityToBonus(awayAdvanceImplied),
+    bookmakerCount: homeNoVigs.length,
+    snapshots,
+  };
+}
+
+function findDrawNoBetMarket(bookmaker: OddsApiBookmaker): OddsApiMarket | undefined {
+  return bookmaker.markets.find((m) => m.key === "draw_no_bet");
+}
+
+/**
+ * Derive knockout advance probabilities from h2h / draw-no-bet when dedicated
+ * advance markets are unavailable (The Odds API does not expose to_advance).
+ */
+export function processKnockoutOddsFromH2h(
+  event: OddsApiEvent,
+  matchId: string,
+  homeTeam: Team,
+  awayTeam: Team,
+  provider: string
+): ProcessedAdvanceOdds | null {
+  const homeNoVigs: number[] = [];
+  const awayNoVigs: number[] = [];
+  const snapshots: OddsSnapshotRow[] = [];
+
+  for (const bookmaker of event.bookmakers ?? []) {
+    const dnb = findDrawNoBetMarket(bookmaker);
+    const market = dnb ?? findH2hMarket(bookmaker);
+    if (!market?.outcomes?.length) continue;
+
+    let homePrice: number | null = null;
+    let drawPrice: number | null = null;
+    let awayPrice: number | null = null;
+
+    for (const outcome of market.outcomes) {
+      const kind = classifyOutcome(outcome.name, homeTeam, awayTeam);
+      if (kind === "home") homePrice = outcome.price;
+      else if (kind === "draw") drawPrice = outcome.price;
+      else if (kind === "away") awayPrice = outcome.price;
+    }
+
+    if (!homePrice || !awayPrice) continue;
+
+    const homeRaw = decimalToImplied(homePrice);
+    const awayRaw = decimalToImplied(awayPrice);
+    let homeNorm: number;
+    let awayNorm: number;
+
+    if (market.key === "draw_no_bet" || !drawPrice) {
+      const noVig = calculateNoVigProbabilities({ home: homeRaw, away: awayRaw });
+      homeNorm = noVig.home;
+      awayNorm = noVig.away;
+    } else {
+      const drawRaw = decimalToImplied(drawPrice);
+      const noVig = calculateNoVigProbabilities({
+        home: homeRaw,
+        draw: drawRaw,
+        away: awayRaw,
+      });
+      const twoWayTotal = noVig.home + noVig.away;
+      if (twoWayTotal <= 0) continue;
+      homeNorm = noVig.home / twoWayTotal;
+      awayNorm = noVig.away / twoWayTotal;
+    }
+
+    homeNoVigs.push(homeNorm);
+    awayNoVigs.push(awayNorm);
+
+    for (const row of [
+      {
+        type: "home_advance" as const,
+        name: homeTeam.name,
+        price: homePrice,
+        raw: homeRaw,
+        norm: homeNorm,
+      },
+      {
+        type: "away_advance" as const,
+        name: awayTeam.name,
+        price: awayPrice,
+        raw: awayRaw,
+        norm: awayNorm,
+      },
+    ]) {
+      snapshots.push({
+        match_id: matchId,
+        provider,
+        source_event_id: event.id,
+        bookmaker_key: bookmaker.key,
+        bookmaker_title: bookmaker.title,
+        market_key: market.key,
+        outcome_name: row.name,
+        outcome_type: row.type,
+        decimal_price: row.price,
+        american_price: decimalToAmerican(row.price),
+        raw_implied_probability: row.raw,
+        normalized_probability: row.norm,
+      });
     }
   }
 

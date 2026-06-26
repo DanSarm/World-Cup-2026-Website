@@ -6,7 +6,7 @@ export function getOddsConfig() {
     provider: process.env.ODDS_API_PROVIDER ?? "the_odds_api",
     regions: process.env.ODDS_REGIONS ?? "us",
     winnerRegions: process.env.ODDS_WINNER_REGIONS ?? "us",
-    markets: process.env.ODDS_MARKETS ?? "h2h",
+    markets: process.env.ODDS_MARKETS ?? "h2h,draw_no_bet",
     oddsFormat: process.env.ODDS_FORMAT ?? "decimal",
     lockHoursBeforeKickoff: Number(process.env.ODDS_LOCK_HOURS_BEFORE_KICKOFF ?? "1"),
     sportKey: process.env.ODDS_SPORT_KEY ?? "soccer_fifa_world_cup",

@@ -1,5 +1,5 @@
 import { GROUP_LETTERS, type Match, type Team } from "./types";
-import { getActualMatchScore } from "./matchResults";
+import { getActualMatchScore, getStandingsMatchScore } from "./matchResults";
 
 export interface PickScore {
   home: number;
@@ -149,6 +149,19 @@ export function computeGroupProjections(
       totalMatches: letterMatches.length,
     };
   }).filter((g) => g.rows.length > 0);
+}
+
+/** Scores from finalized group matches only — for knockout bracket resolution. */
+export function buildStandingsScoreMap(matches: Match[]): Map<string, PickScore> {
+  const result = new Map<string, PickScore>();
+
+  for (const match of matches) {
+    if (match.stage !== "group") continue;
+    const score = getStandingsMatchScore(match);
+    if (score) result.set(match.id, score);
+  }
+
+  return result;
 }
 
 export function buildPickScoreMap(

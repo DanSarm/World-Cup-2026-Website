@@ -4,22 +4,38 @@ import {
   MATCH_SLOTS,
   type SlotRef,
 } from "./knockoutBracket";
-import { buildPickScoreMap } from "./groupStandings";
+import { buildStandingsScoreMap } from "./groupStandings";
+import { isGroupMatchFinalized } from "./matchResults";
 
 function isGroupComplete(matches: Match[], letter: string): boolean {
   const groupMatches = matches.filter(
     (m) => m.stage === "group" && m.group_letter === letter
   );
   return (
-    groupMatches.length > 0 && groupMatches.every((m) => m.status === "final")
+    groupMatches.length > 0 &&
+    groupMatches.every(isGroupMatchFinalized)
   );
 }
 
 function allGroupsComplete(matches: Match[]): boolean {
   const groupMatches = matches.filter((m) => m.stage === "group");
   return (
-    groupMatches.length > 0 && groupMatches.every((m) => m.status === "final")
+    groupMatches.length > 0 && groupMatches.every(isGroupMatchFinalized)
   );
+}
+
+function isKnockoutSourceFinalized(match: Match | undefined): boolean {
+  if (!match) return false;
+  if (match.status === "final") return true;
+  if (
+    match.status === "locked" &&
+    match.home_score != null &&
+    match.away_score != null &&
+    match.home_score !== match.away_score
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -41,9 +57,31 @@ function isSlotDetermined(
     case "winner":
     case "loser": {
       const source = matchesByNumber.get(ref.matchNumber);
-      return source?.status === "final";
+      return isKnockoutSourceFinalized(source);
     }
   }
+}
+
+function knockoutSlotsAreDetermined(
+  matchNumber: number,
+  matches: Match[],
+  matchesByNumber: Map<number, Match>
+): boolean {
+  const slots = MATCH_SLOTS[matchNumber];
+  if (!slots) return false;
+  return (
+    isSlotDetermined(slots.home, matches, matchesByNumber) &&
+    isSlotDetermined(slots.away, matches, matchesByNumber)
+  );
+}
+
+function hasAssignedTeams(match: Match): boolean {
+  return !!(
+    match.home_team_id &&
+    match.away_team_id &&
+    match.home_team &&
+    match.away_team
+  );
 }
 
 /**
@@ -52,9 +90,7 @@ function isSlotDetermined(
  * knockout matchups stay hidden until they are genuinely known.
  */
 export function applyKnownKnockoutTeams(matches: Match[]): Match[] {
-  // Actual final/live scores only — empty pick maps mean no prediction
-  // ever leaks into the projected standings.
-  const actualScores = buildPickScoreMap(matches, new Map(), new Map());
+  const actualScores = buildStandingsScoreMap(matches);
   const bracket = buildKnockoutBracket(matches, actualScores, []);
 
   const matchesByNumber = new Map(matches.map((m) => [m.match_number, m]));
@@ -62,13 +98,9 @@ export function applyKnownKnockoutTeams(matches: Match[]): Match[] {
   return matches.map((match) => {
     if (match.match_number < 73) return match;
 
-    const slots = MATCH_SLOTS[match.match_number];
-    if (!slots) return match;
+    if (hasAssignedTeams(match)) return match;
 
-    if (
-      !isSlotDetermined(slots.home, matches, matchesByNumber) ||
-      !isSlotDetermined(slots.away, matches, matchesByNumber)
-    ) {
+    if (!knockoutSlotsAreDetermined(match.match_number, matches, matchesByNumber)) {
       return match;
     }
 

@@ -67,6 +67,12 @@ export async function getPlayers(): Promise<Player[]> {
   return (data ?? []) as Player[];
 }
 
+function toNullableNumber(value: number | string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function normalizeMatch(row: Match): Match {
   return {
     ...row,
@@ -79,11 +85,11 @@ function normalizeMatch(row: Match): Match {
     odds_last_synced_at: row.odds_last_synced_at ?? row.odds_checked_at ?? null,
     odds_locked_at: row.odds_locked_at ?? null,
     odds_status: row.odds_status ?? "not_synced",
-    home_implied_probability: row.home_implied_probability ?? null,
-    draw_implied_probability: row.draw_implied_probability ?? null,
-    away_implied_probability: row.away_implied_probability ?? null,
-    home_advance_probability: row.home_advance_probability ?? null,
-    away_advance_probability: row.away_advance_probability ?? null,
+    home_implied_probability: toNullableNumber(row.home_implied_probability),
+    draw_implied_probability: toNullableNumber(row.draw_implied_probability),
+    away_implied_probability: toNullableNumber(row.away_implied_probability),
+    home_advance_probability: toNullableNumber(row.home_advance_probability),
+    away_advance_probability: toNullableNumber(row.away_advance_probability),
     live_updated_at: row.live_updated_at ?? null,
     odds_source_note: row.odds_source_note ?? row.odds_source ?? null,
   };
@@ -530,8 +536,14 @@ export async function getLiveSnapshot() {
 }
 
 export async function getPicksSnapshot(playerId: string) {
-  const matches = mergeLiveClocks(await getMatchesWithTeams(), undefined);
-  const pickMatches = resolveMatchesForPicks(matches);
+  let matches = mergeLiveClocks(await getMatchesWithTeams(), undefined);
+  let pickMatches = resolveMatchesForPicks(matches);
+
+  const { maybeSyncUpcomingOdds } = await import("./odds/sync");
+  await maybeSyncUpcomingOdds(pickMatches);
+  matches = mergeLiveClocks(await getMatchesWithTeams(), undefined);
+  pickMatches = resolveMatchesForPicks(matches);
+
   const matchIds = pickMatches.map((m) => m.id);
 
   const [predictions, players, communityPicksByMatchId] = await Promise.all([
