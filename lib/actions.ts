@@ -22,6 +22,7 @@ import {
 } from "./validation";
 import { isMatchLocked, isTournamentPodiumLocked } from "./utils";
 import { getMatchesWithTeams, recalculateAllScores } from "./data";
+import { resolveMatchForPickSaving } from "./resolvedMatches";
 import { POOL_ENTRY_FEE } from "./payouts";
 import type { Match } from "./types";
 
@@ -71,10 +72,24 @@ export async function saveMatchPickAction(formData: FormData) {
 
   const matchId = formData.get("matchId") as string;
   const matches = await getMatchesWithTeams();
-  const m = matches.find((match) => match.id === matchId);
+  const resolved = resolveMatchForPickSaving(matches, matchId);
+  const clientHomeTeamId = (formData.get("homeTeamId") as string) || null;
+  const clientAwayTeamId = (formData.get("awayTeamId") as string) || null;
+
+  const m = resolved
+    ? {
+        ...resolved,
+        home_team_id: resolved.home_team_id ?? clientHomeTeamId,
+        away_team_id: resolved.away_team_id ?? clientAwayTeamId,
+      }
+    : undefined;
 
   if (!m) return { error: "Match not found" };
   if (isMatchLocked(m)) return { error: "Pick locked" };
+
+  if (!m.home_team_id || !m.away_team_id) {
+    return { error: "Teams not set for this match" };
+  }
 
   const parsed = matchPickSchema.safeParse({
     matchId,

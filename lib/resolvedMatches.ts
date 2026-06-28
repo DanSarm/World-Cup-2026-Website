@@ -75,15 +75,6 @@ function knockoutSlotsAreDetermined(
   );
 }
 
-function hasAssignedTeams(match: Match): boolean {
-  return !!(
-    match.home_team_id &&
-    match.away_team_id &&
-    match.home_team &&
-    match.away_team
-  );
-}
-
 /**
  * Fill knockout match rows with teams once bracket slots are decided by
  * actual results. Never resolves from anyone's predictions, so upcoming
@@ -97,8 +88,6 @@ export function applyKnownKnockoutTeams(matches: Match[]): Match[] {
 
   return matches.map((match) => {
     if (match.match_number < 73) return match;
-
-    if (hasAssignedTeams(match)) return match;
 
     if (!knockoutSlotsAreDetermined(match.match_number, matches, matchesByNumber)) {
       return match;
@@ -117,6 +106,14 @@ export function applyKnownKnockoutTeams(matches: Match[]): Match[] {
       away_label: slot.away.team.team.name,
     };
   });
+}
+
+/** Resolve a single match for pick saving, with knockout teams filled in. */
+export function resolveMatchForPickSaving(
+  matches: Match[],
+  matchId: string
+): Match | undefined {
+  return applyKnownKnockoutTeams(matches).find((m) => m.id === matchId);
 }
 
 /** Knockout fixtures only appear on picks once both teams are known. */

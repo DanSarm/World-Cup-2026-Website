@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { Match } from "@/lib/types";
+import { isKnockoutStage } from "@/lib/types";
 import { getKnockoutRoundCardTheme } from "@/lib/knockoutRoundTheme";
 
 interface KnockoutRoundCardShellProps {
@@ -34,7 +35,25 @@ export function KnockoutRoundCardShell({
           <span>{roundTheme.label}</span>
         </div>
       )}
-      {children}
+      <div className={roundTheme ? "relative z-[1]" : undefined}>{children}</div>
     </Tag>
+  );
+}
+
+export function KnockoutRoundCardShellIfNeeded({
+  match,
+  children,
+  className = "card p-0 overflow-hidden",
+  as = "div",
+}: KnockoutRoundCardShellProps) {
+  if (!isKnockoutStage(match.stage)) {
+    const Tag = as;
+    return <Tag className={className}>{children}</Tag>;
+  }
+
+  return (
+    <KnockoutRoundCardShell match={match} className={className} as={as}>
+      {children}
+    </KnockoutRoundCardShell>
   );
 }

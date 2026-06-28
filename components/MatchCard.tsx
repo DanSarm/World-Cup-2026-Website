@@ -105,6 +105,8 @@ export function MatchCard({
     fd.set("matchId", match.id);
     fd.set("predHomeScore", String(homeScore));
     fd.set("predAwayScore", String(awayScore));
+    if (match.home_team_id) fd.set("homeTeamId", match.home_team_id);
+    if (match.away_team_id) fd.set("awayTeamId", match.away_team_id);
     if (winnerId) fd.set("predWinnerTeamId", winnerId);
 
     startTransition(async () => {
@@ -119,7 +121,17 @@ export function MatchCard({
       router.refresh();
       onPickSaved?.();
     });
-  }, [homeScore, awayScore, winnerId, needsWinner, match.id, router, onPickSaved]);
+  }, [
+    homeScore,
+    awayScore,
+    winnerId,
+    needsWinner,
+    match.id,
+    match.home_team_id,
+    match.away_team_id,
+    router,
+    onPickSaved,
+  ]);
 
   function handleLockToggle() {
     if (isLocked) {
@@ -258,8 +270,23 @@ export function MatchCard({
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
           <p className="text-sm font-semibold text-ink">
-            {match.group_letter ? `Group ${match.group_letter}` : getStageLabel(match.stage)}
-            <span className="text-ink-faint font-normal"> · {formatKickoff(match.kickoff_at)}</span>
+            {match.group_letter
+              ? `Group ${match.group_letter}`
+              : embedded && isKO
+                ? formatKickoff(match.kickoff_at)
+                : getStageLabel(match.stage)}
+            {!match.group_letter && !(embedded && isKO) && (
+              <span className="text-ink-faint font-normal">
+                {" "}
+                · {formatKickoff(match.kickoff_at)}
+              </span>
+            )}
+            {match.group_letter && (
+              <span className="text-ink-faint font-normal">
+                {" "}
+                · {formatKickoff(match.kickoff_at)}
+              </span>
+            )}
           </p>
           {match.venue && (
             <p className="text-xs text-ink-faint truncate">{match.venue}</p>

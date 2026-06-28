@@ -20,7 +20,7 @@ import { canRevealOtherPlayersPicks } from "@/lib/pickVisibility";
 import { canPickMatch } from "@/lib/utils";
 import { hasSavedPick } from "@/lib/pickUtils";
 import { UrgentPill } from "./UrgentPill";
-import { KnockoutRoundCardShell } from "./KnockoutRoundCardShell";
+import { KnockoutRoundCardShellIfNeeded } from "./KnockoutRoundCardShell";
 
 interface HomeFeaturedMatchSectionProps {
   match: Match;
@@ -82,7 +82,11 @@ export function HomeFeaturedMatchSection({
   }, [picks, picksRevealed]);
 
   return (
-    <KnockoutRoundCardShell match={match} as="section" className="card p-0 overflow-hidden">
+    <KnockoutRoundCardShellIfNeeded
+      match={match}
+      as="section"
+      className="card p-0 overflow-hidden"
+    >
       <div className="px-4 sm:px-5 py-3 border-b border-ink/5 bg-cream/30">
         <div className="flex items-center gap-2 flex-wrap">
           <h2 className="text-sm font-bold text-usa uppercase tracking-wide">
@@ -116,6 +120,6 @@ export function HomeFeaturedMatchSection({
         totalPlayers={totalPlayers}
         predictedCount={predictedCount}
       />
-    </KnockoutRoundCardShell>
+    </KnockoutRoundCardShellIfNeeded>
   );
 }
