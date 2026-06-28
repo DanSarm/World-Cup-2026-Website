@@ -70,15 +70,10 @@ export async function saveMatchPickAction(formData: FormData) {
   const supabase = getSupabase();
 
   const matchId = formData.get("matchId") as string;
-  const { data: match } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("id", matchId)
-    .single();
+  const matches = await getMatchesWithTeams();
+  const m = matches.find((match) => match.id === matchId);
 
-  if (!match) return { error: "Match not found" };
-
-  const m = match as Match;
+  if (!m) return { error: "Match not found" };
   if (isMatchLocked(m)) return { error: "Pick locked" };
 
   const parsed = matchPickSchema.safeParse({

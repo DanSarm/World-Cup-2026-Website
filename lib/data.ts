@@ -24,7 +24,10 @@ import {
 } from "./rankMovement";
 import { mergeLiveClocks } from "./liveClock";
 import { matchDateKey } from "./utils";
-import { resolveMatchesForPicks } from "./resolvedMatches";
+import {
+  applyKnownKnockoutTeams,
+  resolveMatchesForPicks,
+} from "./resolvedMatches";
 import type {
   ActualTournamentResults,
   BigPrediction,
@@ -95,6 +98,46 @@ function normalizeMatch(row: Match): Match {
   };
 }
 
+async function syncKnownKnockoutTeamAssignments(
+  rawMatches: Match[],
+  resolvedMatches: Match[]
+): Promise<void> {
+  const rawById = new Map(rawMatches.map((m) => [m.id, m]));
+  const supabase = getSupabase();
+  const updates: Promise<unknown>[] = [];
+
+  for (const resolved of resolvedMatches) {
+    if (resolved.match_number < 73) continue;
+    if (!resolved.home_team_id || !resolved.away_team_id) continue;
+
+    const raw = rawById.get(resolved.id);
+    if (!raw) continue;
+    if (
+      raw.home_team_id === resolved.home_team_id &&
+      raw.away_team_id === resolved.away_team_id
+    ) {
+      continue;
+    }
+
+    updates.push(
+      supabase
+        .from("matches")
+        .update({
+          home_team_id: resolved.home_team_id,
+          away_team_id: resolved.away_team_id,
+          home_label: resolved.home_label ?? resolved.home_team?.name ?? null,
+          away_label: resolved.away_label ?? resolved.away_team?.name ?? null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", resolved.id)
+    );
+  }
+
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
+}
+
 export async function getMatchesWithTeams(): Promise<Match[]> {
   await ensureMatchesSeeded();
   const supabase = getSupabase();
@@ -104,7 +147,10 @@ export async function getMatchesWithTeams(): Promise<Match[]> {
       "*, home_team:teams!matches_home_team_id_fkey(*), away_team:teams!matches_away_team_id_fkey(*)"
     )
     .order("match_number");
-  return ((data ?? []) as Match[]).map(normalizeMatch);
+  const rawMatches = ((data ?? []) as Match[]).map(normalizeMatch);
+  const resolvedMatches = applyKnownKnockoutTeams(rawMatches);
+  await syncKnownKnockoutTeamAssignments(rawMatches, resolvedMatches);
+  return resolvedMatches;
 }
 
 export async function getPredictions(
