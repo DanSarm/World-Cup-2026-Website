@@ -112,25 +112,21 @@ body {
 
 .pick-card--r32 {
   border-left: 4px solid #38bdf8;
-  background: linear-gradient(90deg, rgb(56 189 248 / 0.06) 0%, var(--color-white) 18%);
   box-shadow: var(--shadow-card), inset 0 1px 0 rgb(56 189 248 / 0.12);
 }
 
 .pick-card--r16 {
   border-left: 4px solid var(--color-mexico-light);
-  background: linear-gradient(90deg, rgb(0 135 81 / 0.05) 0%, var(--color-white) 18%);
   box-shadow: var(--shadow-card), inset 0 1px 0 rgb(0 135 81 / 0.1);
 }
 
 .pick-card--qf {
   border-left: 4px solid var(--color-gold);
-  background: linear-gradient(90deg, rgb(212 175 55 / 0.07) 0%, var(--color-white) 18%);
   box-shadow: var(--shadow-card), inset 0 1px 0 rgb(212 175 55 / 0.14);
 }
 
 .pick-card--sf {
   border-left: 4px solid var(--color-usa);
-  background: linear-gradient(90deg, rgb(0 40 104 / 0.05) 0%, var(--color-white) 18%);
   box-shadow:
     var(--shadow-card),
     inset 3px 0 0 var(--color-gold),
@@ -139,21 +135,18 @@ body {
 
 .pick-card--third {
   border-left: 4px solid #b87333;
-  background: linear-gradient(90deg, rgb(184 115 51 / 0.06) 0%, var(--color-white) 18%);
   box-shadow: var(--shadow-card), inset 0 1px 0 rgb(184 115 51 / 0.12);
 }
 
 .pick-card--final {
   border: 1px solid rgb(212 175 55 / 0.45);
   border-left: 4px solid var(--color-gold-dark);
-  background: linear-gradient(90deg, rgb(240 203 95 / 0.1) 0%, var(--color-white) 22%);
   box-shadow: var(--shadow-card), var(--shadow-glow-gold);
 }
 
 .pick-card--r32::before,
 .pick-card--r16::before,
 .pick-card--qf::before,
-.pick-card--sf::before,
 .pick-card--third::before,
 .pick-card--final::before {
   content: "";
@@ -162,33 +155,29 @@ body {
   height: 2.75rem;
   pointer-events: none;
   border-radius: inherit;
+  z-index: 0;
 }
 
 .pick-card--r32::before {
-  background: linear-gradient(180deg, rgb(56 189 248 / 0.09) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgb(56 189 248 / 0.06) 0%, transparent 100%);
 }
 
 .pick-card--r16::before {
-  background: linear-gradient(180deg, rgb(0 135 81 / 0.08) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgb(0 135 81 / 0.06) 0%, transparent 100%);
 }
 
 .pick-card--qf::before {
-  background: linear-gradient(180deg, rgb(212 175 55 / 0.1) 0%, transparent 100%);
-}
-
-.pick-card--sf::before {
-  background: linear-gradient(135deg, rgb(0 40 104 / 0.07) 0%, rgb(212 175 55 / 0.06) 100%);
+  background: linear-gradient(180deg, rgb(212 175 55 / 0.07) 0%, transparent 100%);
 }
 
 .pick-card--third::before {
-  background: linear-gradient(180deg, rgb(184 115 51 / 0.09) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgb(184 115 51 / 0.06) 0%, transparent 100%);
 }
 
 .pick-card--final::before {
   background: linear-gradient(
     180deg,
-    rgb(240 203 95 / 0.16) 0%,
-    rgb(212 175 55 / 0.05) 45%,
+    rgb(240 203 95 / 0.12) 0%,
     transparent 100%
   );
 }

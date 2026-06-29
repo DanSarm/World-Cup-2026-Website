@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/auth";
-import { getLeaderboardData, getPredictions, getConfirmedMatchPicks, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
+import { getLeaderboardData, getPredictions, getConfirmedMatchPicksByMatchIds, getTeams, getMyTournamentPodium, getPlayers } from "@/lib/data";
 import { calculatePrizePool } from "@/lib/payouts";
 import { findNextUpcomingMatches } from "@/lib/nextPick";
 import { scoringConfigFromSettings } from "@/lib/scoringConfig";
@@ -47,13 +47,14 @@ export default async function HomePage() {
     ...liveMatches.map((m) => m.id),
     ...upcomingMatches.map((m) => m.id),
   ];
-  const communityPicksByMatchId = new Map(
-    await Promise.all(
-      matchIdsToLoad.map(async (id) => [id, await getConfirmedMatchPicks(id)] as const)
-    )
+  const communityPicksByMatchId = await getConfirmedMatchPicksByMatchIds(
+    matchIdsToLoad
   );
   const communityPickCountsByMatchId = Object.fromEntries(
-    [...communityPicksByMatchId.entries()].map(([id, picks]) => [id, picks.length])
+    matchIdsToLoad.map((id) => [
+      id,
+      (communityPicksByMatchId.get(id) ?? []).length,
+    ])
   );
 
   const totalPlayers = players.length;

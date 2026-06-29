@@ -1,4 +1,5 @@
 import { SignJWT } from "jose/jwt/sign";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import type { SessionPlayer } from "./types";
 import {
@@ -31,12 +32,15 @@ export async function createSession(player: SessionPlayer): Promise<string> {
     .sign(getSecret());
 }
 
-export async function getSession(): Promise<SessionPlayer | null> {
+async function readSession(): Promise<SessionPlayer | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
   return verifySession(token);
 }
+
+/** Per-request memoized session read (layout + page often both call this). */
+export const getSession = cache(readSession);
 
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();

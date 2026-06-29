@@ -21,6 +21,7 @@ import { calculateExactScoreFireBonus } from "./fireBonus";
 import {
   capGroupMatchPoints,
   previewPickRewards,
+  resolvePredictedKnockoutWinner,
   scoringConfigFromSettings,
   type ScoringConfig,
   DEFAULT_SCORING_CONFIG,
@@ -188,8 +189,14 @@ export function scoreMatchPrediction(
           ? match.away_team_id
           : null);
 
+    const predictedWinner = resolvePredictedKnockoutWinner(
+      match,
+      predHome,
+      predAway,
+      prediction.pred_winner_team_id
+    );
     const knockoutCorrect =
-      !!actualWinner && prediction.pred_winner_team_id === actualWinner;
+      !!actualWinner && predictedWinner === actualWinner;
 
     if (!knockoutCorrect) {
       return empty;

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import bcrypt from "bcryptjs";
 import { getSupabase } from "./supabaseServer";
 import { getTeamIdByCode } from "./teamsDb";
@@ -56,7 +57,7 @@ const DEFAULT_SETTINGS: Settings = {
   odds_lock_hours_before_kickoff: 1,
 };
 
-export async function getSettings(): Promise<Settings> {
+async function loadSettings(): Promise<Settings> {
   const supabase = getSupabase();
   const { data } = await supabase.from("settings").select("key, value");
 
@@ -117,6 +118,8 @@ export async function getSettings(): Promise<Settings> {
 
   return settings;
 }
+
+export const getSettings = cache(loadSettings);
 
 async function findPlayerByDisplayName<
   T extends { display_name: string },

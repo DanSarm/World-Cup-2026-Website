@@ -2,7 +2,11 @@ import { getSupabase } from "./supabaseServer";
 import { ensureTeamsSeeded } from "./teamsDb";
 import { ALL_FIXTURES } from "./fixturesData";
 
+let matchesSeedVerified = false;
+
 export async function ensureMatchesSeeded(): Promise<void> {
+  if (matchesSeedVerified) return;
+
   const supabase = getSupabase();
   await ensureTeamsSeeded();
 
@@ -10,7 +14,10 @@ export async function ensureMatchesSeeded(): Promise<void> {
     .from("matches")
     .select("*", { count: "exact", head: true });
 
-  if (count && count >= ALL_FIXTURES.length) return;
+  if (count && count >= ALL_FIXTURES.length) {
+    matchesSeedVerified = true;
+    return;
+  }
 
   const { data: teams } = await supabase.from("teams").select("id, fifa_code");
   const teamMap = new Map(
@@ -38,4 +45,6 @@ export async function ensureMatchesSeeded(): Promise<void> {
       { onConflict: "match_number" }
     );
   }
+
+  matchesSeedVerified = true;
 }

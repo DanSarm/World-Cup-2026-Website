@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabase } from "./supabaseServer";
 import { getSettings } from "./auth";
 import { ensureMatchesSeeded } from "./matchesDb";
@@ -44,7 +45,7 @@ import type {
 
 export type { CommunityMatchPick } from "./types";
 
-export async function getTeams(): Promise<Team[]> {
+async function loadTeams(): Promise<Team[]> {
   try {
     await ensureTeamsSeeded();
     const supabase = getSupabase();
@@ -64,11 +65,15 @@ export async function getTeams(): Promise<Team[]> {
   })) as Team[];
 }
 
-export async function getPlayers(): Promise<Player[]> {
+export const getTeams = cache(loadTeams);
+
+async function loadPlayers(): Promise<Player[]> {
   const supabase = getSupabase();
   const { data } = await supabase.from("players").select("*").order("display_name");
   return (data ?? []) as Player[];
 }
+
+export const getPlayers = cache(loadPlayers);
 
 function toNullableNumber(value: number | string | null | undefined): number | null {
   if (value == null || value === "") return null;
@@ -104,7 +109,7 @@ async function syncKnownKnockoutTeamAssignments(
 ): Promise<void> {
   const rawById = new Map(rawMatches.map((m) => [m.id, m]));
   const supabase = getSupabase();
-  const updates: Promise<unknown>[] = [];
+  const updates: PromiseLike<unknown>[] = [];
 
   for (const resolved of resolvedMatches) {
     if (resolved.match_number < 73) continue;
@@ -138,7 +143,7 @@ async function syncKnownKnockoutTeamAssignments(
   }
 }
 
-export async function getMatchesWithTeams(): Promise<Match[]> {
+async function loadMatchesWithTeams(): Promise<Match[]> {
   await ensureMatchesSeeded();
   const supabase = getSupabase();
   const { data } = await supabase
@@ -153,15 +158,26 @@ export async function getMatchesWithTeams(): Promise<Match[]> {
   return resolvedMatches;
 }
 
-export async function getPredictions(
-  playerId?: string
-): Promise<MatchPrediction[]> {
+const getMatchesWithTeamsMemo = cache(loadMatchesWithTeams);
+
+/** Memoized per request — use getMatchesWithTeamsFresh after odds/knockout DB writes. */
+export async function getMatchesWithTeams(): Promise<Match[]> {
+  return getMatchesWithTeamsMemo();
+}
+
+export async function getMatchesWithTeamsFresh(): Promise<Match[]> {
+  return loadMatchesWithTeams();
+}
+
+async function loadPredictions(playerId?: string): Promise<MatchPrediction[]> {
   const supabase = getSupabase();
   let query = supabase.from("match_predictions").select("*");
   if (playerId) query = query.eq("player_id", playerId);
   const { data } = await query;
   return (data ?? []) as MatchPrediction[];
 }
+
+export const getPredictions = cache(loadPredictions);
 
 export async function getConfirmedMatchPicks(
   matchId: string
@@ -275,7 +291,7 @@ export async function getConfirmedMatchPicksByMatchIds(
   return byMatch;
 }
 
-export async function getTournamentPodiumPredictions(): Promise<
+async function loadTournamentPodiumPredictions(): Promise<
   TournamentPodiumPrediction[]
 > {
   const supabase = getSupabase();
@@ -285,7 +301,11 @@ export async function getTournamentPodiumPredictions(): Promise<
   return (data ?? []) as TournamentPodiumPrediction[];
 }
 
-export async function getMyTournamentPodium(
+export const getTournamentPodiumPredictions = cache(
+  loadTournamentPodiumPredictions
+);
+
+async function loadMyTournamentPodium(
   playerId: string
 ): Promise<TournamentPodiumPrediction | null> {
   const supabase = getSupabase();
@@ -297,25 +317,31 @@ export async function getMyTournamentPodium(
   return (data as TournamentPodiumPrediction | null) ?? null;
 }
 
+export const getMyTournamentPodium = cache(loadMyTournamentPodium);
+
 export async function getBigPredictions(): Promise<BigPrediction[]> {
   const supabase = getSupabase();
   const { data } = await supabase.from("big_predictions").select("*");
   return (data ?? []) as BigPrediction[];
 }
 
-export async function getFinalsPredictions(): Promise<FinalsChallengePrediction[]> {
+async function loadFinalsPredictions(): Promise<FinalsChallengePrediction[]> {
   const supabase = getSupabase();
   const { data } = await supabase.from("finals_challenge_predictions").select("*");
   return (data ?? []) as FinalsChallengePrediction[];
 }
 
-export async function getAdjustments(): Promise<ManualAdjustment[]> {
+export const getFinalsPredictions = cache(loadFinalsPredictions);
+
+async function loadAdjustments(): Promise<ManualAdjustment[]> {
   const supabase = getSupabase();
   const { data } = await supabase.from("manual_adjustments").select("*");
   return (data ?? []) as ManualAdjustment[];
 }
 
-export async function getActualResults(): Promise<ActualTournamentResults> {
+export const getAdjustments = cache(loadAdjustments);
+
+async function loadActualResults(): Promise<ActualTournamentResults> {
   const supabase = getSupabase();
   const { data } = await supabase.from("actual_tournament_results").select("*");
   const results: ActualTournamentResults = {};
@@ -356,6 +382,8 @@ export async function getActualResults(): Promise<ActualTournamentResults> {
   }
   return results;
 }
+
+export const getActualResults = cache(loadActualResults);
 
 /**
  * Rank movement = current rank vs the board immediately before the most
@@ -574,7 +602,7 @@ export async function getLeaderboardData(options?: {
 
 export async function getLiveSnapshot() {
   const { syncLiveScores } = await import("./scores/sync");
-  const sync = await syncLiveScores(true);
+  const sync = await syncLiveScores(false);
   const snapshot = await getLeaderboardData({ includeLiveScores: true });
   const matches = mergeLiveClocks(snapshot.matches, sync.liveClockByMatchId);
   const liveMatch = findLiveMatch(matches);
@@ -586,9 +614,11 @@ export async function getPicksSnapshot(playerId: string) {
   let pickMatches = resolveMatchesForPicks(matches);
 
   const { maybeSyncUpcomingOdds } = await import("./odds/sync");
-  await maybeSyncUpcomingOdds(pickMatches);
-  matches = mergeLiveClocks(await getMatchesWithTeams(), undefined);
-  pickMatches = resolveMatchesForPicks(matches);
+  const oddsResult = await maybeSyncUpcomingOdds(pickMatches);
+  if (oddsResult.synced) {
+    matches = mergeLiveClocks(await getMatchesWithTeamsFresh(), undefined);
+    pickMatches = resolveMatchesForPicks(matches);
+  }
 
   const matchIds = pickMatches.map((m) => m.id);
 

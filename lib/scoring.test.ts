@@ -224,6 +224,26 @@ assert(
 
 assert(
   scoreMatchPrediction(
+    {
+      ...koMatch,
+      stage: "round_of_32",
+      home_score: 0,
+      away_score: 1,
+      winner_team_id: "can",
+      home_team_id: "rsa",
+      away_team_id: "can",
+    },
+    {
+      pred_home_score: 0,
+      pred_away_score: 2,
+      pred_winner_team_id: null,
+    }
+  ).points === 4,
+  "knockout infers away advancer from score when pred_winner is null"
+);
+
+assert(
+  scoreMatchPrediction(
     { ...koMatch, home_score: 2, away_score: 0, winner_team_id: "bra" },
     {
       pred_home_score: 2,

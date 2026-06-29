@@ -40,7 +40,7 @@ export function getKnockoutRoundCardTheme(
   stage: MatchStage
 ): KnockoutRoundCardTheme | null {
   if (!isKnockoutStage(stage)) return null;
-  const base = THEMES[stage];
+  const base = THEMES[stage as keyof typeof THEMES];
   return {
     ...base,
     label: getStageLabel(stage),

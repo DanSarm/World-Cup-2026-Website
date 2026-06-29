@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { getSettings } from "@/lib/auth";
 import {
   getMatchesWithTeams,
+  getMatchesWithTeamsFresh,
   getPredictions,
   getTeams,
   getMyTournamentPodium,
@@ -20,7 +21,7 @@ export default async function PicksPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  let [matches, settings, teams, myPodium, players] = await Promise.all([
+  const [matchesInitial, settings, teams, myPodium, players] = await Promise.all([
     getMatchesWithTeams(),
     getSettings(),
     getTeams(),
@@ -28,10 +29,14 @@ export default async function PicksPage() {
     getPlayers(),
   ]);
 
+  let matches = matchesInitial;
+
   let pickMatches = resolveMatchesForPicks(matches);
-  await maybeSyncUpcomingOdds(pickMatches);
-  matches = await getMatchesWithTeams();
-  pickMatches = resolveMatchesForPicks(matches);
+  const oddsResult = await maybeSyncUpcomingOdds(pickMatches);
+  if (oddsResult.synced) {
+    matches = await getMatchesWithTeamsFresh();
+    pickMatches = resolveMatchesForPicks(matches);
+  }
 
   const predictions = await getPredictions(session.id);
 

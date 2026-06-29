@@ -51,6 +51,19 @@ function getResult(
   return "draw";
 }
 
+/** Knockout tie picks need an explicit advancer; otherwise infer from the scoreline. */
+export function resolvePredictedKnockoutWinner(
+  match: Pick<Match, "home_team_id" | "away_team_id">,
+  predHome: number,
+  predAway: number,
+  predWinnerTeamId?: string | null
+): string | null {
+  if (predWinnerTeamId) return predWinnerTeamId;
+  if (predHome > predAway) return match.home_team_id;
+  if (predAway > predHome) return match.away_team_id;
+  return null;
+}
+
 export function outcomeBonusForScoreline(
   match: Pick<
     Match,
@@ -124,13 +137,12 @@ export function previewPickRewards(
   predWinnerTeamId?: string | null
 ): PickRewardPreview {
   if (isKnockoutStage(match.stage)) {
-    const winnerId =
-      predWinnerTeamId ??
-      (predHome > predAway
-        ? match.home_team_id
-        : predAway > predHome
-          ? match.away_team_id
-          : null);
+    const winnerId = resolvePredictedKnockoutWinner(
+      match,
+      predHome,
+      predAway,
+      predWinnerTeamId
+    );
     const advanceBonus = outcomeBonusForScoreline(
       match,
       predHome,

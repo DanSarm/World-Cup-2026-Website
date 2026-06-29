@@ -44,6 +44,7 @@ export interface SyncUpcomingResult {
   locked: number;
   needsManual: number;
   results: SyncOddsResult[];
+  schemaError?: string;
 }
 
 function getLockTime(kickoffAt: string, lockHours: number): number {
@@ -86,7 +87,7 @@ async function loadMatchesByIds(matchIds: string[]): Promise<Match[]> {
   return (data ?? []) as Match[];
 }
 
-function usePaidMatchOdds(): boolean {
+function isPaidMatchOddsEnabled(): boolean {
   return process.env.ODDS_USE_PAID_MATCH_ODDS === "true";
 }
 
@@ -341,7 +342,7 @@ export async function maybeSyncUpcomingOdds(
       : espnResult;
   }
 
-  if (usePaidMatchOdds()) {
+  if (isPaidMatchOddsEnabled()) {
     refreshed = await loadMatchesByIds(needsSync.map((m) => m.id));
     stillNeeding = refreshed.filter(matchNeedsOddsSync);
     if (stillNeeding.length) {
