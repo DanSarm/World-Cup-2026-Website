@@ -58,10 +58,20 @@ export function resolvePredictedKnockoutWinner(
   predAway: number,
   predWinnerTeamId?: string | null
 ): string | null {
-  if (predWinnerTeamId) return predWinnerTeamId;
-  if (predHome > predAway) return match.home_team_id;
-  if (predAway > predHome) return match.away_team_id;
-  return null;
+  const fromScore =
+    predHome > predAway
+      ? match.home_team_id
+      : predAway > predHome
+        ? match.away_team_id
+        : null;
+
+  if (predWinnerTeamId) {
+    if (fromScore && predWinnerTeamId !== fromScore) {
+      return fromScore;
+    }
+    return predWinnerTeamId;
+  }
+  return fromScore;
 }
 
 export function outcomeBonusForScoreline(

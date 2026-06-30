@@ -37,6 +37,27 @@ import {
 } from "./tournamentValue";
 import { matchDateKey } from "./utils";
 
+/** Knockout match decided on penalties (explicit flag or tied score + advancer). */
+function isKnockoutPenaltyDecided(
+  match: Pick<
+    Match,
+    | "stage"
+    | "home_score"
+    | "away_score"
+    | "winner_team_id"
+    | "decided_by_penalties"
+  >
+): boolean {
+  if (!isKnockoutStage(match.stage)) return false;
+  if (match.decided_by_penalties) return true;
+  return (
+    match.home_score !== null &&
+    match.away_score !== null &&
+    match.home_score === match.away_score &&
+    match.winner_team_id != null
+  );
+}
+
 function getKnockoutAdvancePoints(stage: MatchStage): number {
   const map: Partial<Record<MatchStage, number>> = {
     round_of_32: 4,
@@ -60,6 +81,16 @@ function getResult(
 
 function getMargin(homeScore: number, awayScore: number): number {
   return Math.abs(homeScore - awayScore);
+}
+
+/** Picked score equals the final score (pool "exact" stat). */
+export function isScorelineMatch(
+  predHome: number,
+  predAway: number,
+  actualHome: number,
+  actualAway: number
+): boolean {
+  return predHome === actualHome && predAway === actualAway;
 }
 
 export interface ScoreMatchResult {
@@ -133,6 +164,7 @@ export function scoreMatchPrediction(
     | "away_implied_probability"
     | "home_advance_bonus"
     | "away_advance_bonus"
+    | "decided_by_penalties"
   >,
   prediction: Pick<
     MatchPrediction,
@@ -195,11 +227,39 @@ export function scoreMatchPrediction(
       predAway,
       prediction.pred_winner_team_id
     );
-    const knockoutCorrect =
-      !!actualWinner && predictedWinner === actualWinner;
 
-    if (!knockoutCorrect) {
+    if (!actualWinner || predictedWinner !== actualWinner) {
       return empty;
+    }
+
+    const penaltyDecided = isKnockoutPenaltyDecided(match);
+    const predictedTie = predHome === predAway;
+
+    if (penaltyDecided) {
+      if (predictedTie) {
+        // Tie pick: exact scoreline required for any points after pens.
+        if (error !== 0) return empty;
+      } else {
+        // Non-tie pick: correct advancer after pens earns base only.
+        const basePoints = getKnockoutAdvancePoints(match.stage);
+        const outcomeBonus = knockoutAdvanceBonus(match, actualWinner);
+        const points = basePoints + outcomeBonus;
+        return {
+          points,
+          exactScore: false,
+          correctResult: true,
+          knockoutCorrect: true,
+          outcomeBonus,
+          fireBonus: 0,
+          breakdown: {
+            basePoints,
+            exactScoreBonus: 0,
+            outcomeBonus,
+            fireBonus: 0,
+            total: points,
+          },
+        };
+      }
     }
 
     const basePoints = getKnockoutAdvancePoints(match.stage);
@@ -224,7 +284,7 @@ export function scoreMatchPrediction(
 
     return {
       points,
-      exactScore: exact,
+      exactScore: error === 0,
       correctResult: true,
       knockoutCorrect: true,
       outcomeBonus,

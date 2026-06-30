@@ -80,6 +80,8 @@ const events: EspnScoreEvent[] = [
     completed: true,
     inProgress: false,
     liveClockDisplay: null,
+    winnerTeamName: "South Korea",
+    decidedByPenalties: false,
   },
 ];
 

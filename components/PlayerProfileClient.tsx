@@ -13,10 +13,6 @@ import { LeaderboardProgressionChart } from "./LeaderboardProgressionChart";
 
 type PickFilter = "all" | "exact" | "correct" | "miss";
 
-function isDecidedPick(pick: PlayerPickSummary): boolean {
-  return pick.status === "scored" || pick.status === "live";
-}
-
 interface PlayerProfileClientProps {
   profile: PlayerProfileData;
   isOwnProfile?: boolean;
@@ -30,7 +26,11 @@ function formatPickScore(pick: PlayerPickSummary): string {
 
 function formatActualScore(pick: PlayerPickSummary): string | null {
   if (pick.actualHome == null || pick.actualAway == null) return null;
-  return `${pick.actualHome}–${pick.actualAway}`;
+  const score = `${pick.actualHome}–${pick.actualAway}`;
+  if (pick.decidedByPenalties && pick.actualWinnerCode) {
+    return `${score} · ${pick.actualWinnerCode} won on pens`;
+  }
+  return score;
 }
 
 function pickStageTag(pick: PlayerPickSummary): string {
@@ -50,6 +50,9 @@ function pickOutcomePill(pick: PlayerPickSummary): {
   }
   if (pick.exactScore) {
     return { label: "Exact", className: "profile-pick-pill profile-pick-pill--exact" };
+  }
+  if (pick.scorelineMatch && !pick.correctResult) {
+    return { label: "Miss", className: "profile-pick-pill profile-pick-pill--miss" };
   }
   if (pick.correctResult) {
     return { label: "Correct", className: "profile-pick-pill profile-pick-pill--correct" };
@@ -110,6 +113,12 @@ function PickCard({ pick }: { pick: PlayerPickSummary }) {
         </div>
       </div>
 
+      {pick.outcomeNote && (
+        <p className="profile-pick-outcome-note text-xs text-canada mt-2">
+          {pick.outcomeNote}
+        </p>
+      )}
+
       {pick.breakdownLines.length > 0 && (
         <details className="profile-pick-breakdown group">
           <summary className="profile-pick-breakdown-toggle">
@@ -140,17 +149,36 @@ export function PlayerProfileClient({
       ? profile.pointsBreakdown.provisionalTotalPoints
       : profile.pointsBreakdown.totalPoints;
 
+  const scoredPicks = useMemo(
+    () => profile.picks.filter((p) => p.status === "scored"),
+    [profile.picks]
+  );
+
+  const filterCounts = useMemo(
+    () => ({
+      all: scoredPicks.length,
+      exact: profile.exactScores,
+      correct: profile.correctResults - profile.exactScores,
+      miss: profile.pickStats.wrong,
+    }),
+    [scoredPicks.length, profile.exactScores, profile.correctResults, profile.pickStats.wrong]
+  );
+
   const filteredPicks = useMemo(() => {
     if (pickFilter === "all") return profile.picks;
     if (pickFilter === "exact") {
-      return profile.picks.filter((p) => isDecidedPick(p) && p.exactScore);
+      return profile.picks.filter(
+        (p) => p.status === "scored" && p.exactScore
+      );
     }
     if (pickFilter === "correct") {
       return profile.picks.filter(
-        (p) => isDecidedPick(p) && p.correctResult && !p.exactScore
+        (p) => p.status === "scored" && p.correctResult && !p.exactScore
       );
     }
-    return profile.picks.filter((p) => isDecidedPick(p) && !p.correctResult);
+    return profile.picks.filter(
+      (p) => p.status === "scored" && !p.correctResult
+    );
   }, [profile.picks, pickFilter]);
 
   const pb = profile.pointsBreakdown;
@@ -202,9 +230,13 @@ export function PlayerProfileClient({
                   {profile.picksMade} picks ·{" "}
                 </>
               )}
-              {profile.pickStats.exact} exact ·{" "}
-              {profile.pickStats.exact + profile.pickStats.correct} correct ·{" "}
+              {profile.exactScores} exact ·{" "}
+              {profile.correctResults - profile.exactScores} other correct ·{" "}
               {profile.pickStats.wrong} wrong
+              <span className="text-ink-faint">
+                {" "}
+                · {profile.pointsBreakdown.matchPoints} match pts
+              </span>
             </p>
             <RecentPickFormDots
               form={profile.recentForm ?? []}
@@ -263,10 +295,10 @@ export function PlayerProfileClient({
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {(
             [
-              ["all", "All"],
-              ["exact", "Exact"],
-              ["correct", "Correct"],
-              ["miss", "Miss"],
+              ["all", `All (${filterCounts.all})`],
+              ["exact", `Exact (${filterCounts.exact})`],
+              ["correct", `Correct (${filterCounts.correct})`],
+              ["miss", `Miss (${filterCounts.miss})`],
             ] as const
           ).map(([key, label]) => (
             <button

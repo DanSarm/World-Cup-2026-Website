@@ -24,11 +24,14 @@ export interface EspnScoreEvent {
   completed: boolean;
   inProgress: boolean;
   liveClockDisplay: string | null;
+  winnerTeamName: string | null;
+  decidedByPenalties: boolean;
 }
 
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score?: string;
+  winner?: boolean;
   team?: { displayName?: string; abbreviation?: string };
 }
 
@@ -39,6 +42,7 @@ interface EspnScoreboardResponse {
       competitors?: EspnCompetitor[];
       status?: {
         displayClock?: string;
+        period?: number;
         type?: {
           state?: string;
           completed?: boolean;
@@ -68,6 +72,15 @@ function parseEspnEvent(raw: NonNullable<EspnScoreboardResponse["events"]>[numbe
   const status = competition.status?.type;
   const state = status?.state ?? "pre";
   const completed = status?.completed === true || state === "post";
+  const statusName = (status?.name ?? "").toUpperCase();
+  const statusDesc = (status?.description ?? "").toLowerCase();
+  const winnerCompetitor = competitors.find((c) => c.winner === true);
+  const decidedByPenalties =
+    statusName.includes("SHOOTOUT") ||
+    statusName.includes("PENALT") ||
+    statusDesc.includes("penalt") ||
+    statusDesc.includes("shootout") ||
+    (completed && homeScore === awayScore && !!winnerCompetitor);
 
   return {
     id: raw.id,
@@ -78,6 +91,8 @@ function parseEspnEvent(raw: NonNullable<EspnScoreboardResponse["events"]>[numbe
     completed,
     inProgress: state === "in",
     liveClockDisplay: formatEspnLiveClock(competition.status),
+    winnerTeamName: winnerCompetitor?.team?.displayName ?? null,
+    decidedByPenalties,
   };
 }
 

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/odds/polymarketChampionOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts && tsx lib/scores/espnScores.test.ts && tsx lib/scores/espnScoreboardDates.test.ts && tsx lib/defaultPredictions.test.ts && tsx lib/predictionGuard.test.ts && tsx lib/playerNames.test.ts && tsx lib/recentPickForm.test.ts && tsx lib/pickReminders.test.ts && tsx lib/notifications/builders.test.ts && tsx lib/matchFinalize.test.ts",
+    "test": "tsx lib/scoring.test.ts && tsx lib/odds/math.test.ts && tsx lib/odds/championOdds.test.ts && tsx lib/odds/polymarketChampionOdds.test.ts && tsx lib/groupStandings.test.ts && tsx lib/fireBonus.test.ts && tsx lib/knockoutBracket.test.ts && tsx lib/scores/espnScores.test.ts && tsx lib/scores/espnScoreboardDates.test.ts && tsx lib/liveClock.test.ts && tsx lib/defaultPredictions.test.ts && tsx lib/predictionGuard.test.ts && tsx lib/playerNames.test.ts && tsx lib/recentPickForm.test.ts && tsx lib/pickReminders.test.ts && tsx lib/notifications/builders.test.ts && tsx lib/matchFinalize.test.ts",
     "seed": "tsx scripts/seed.ts",
     "migrate:pick-confirmed": "tsx scripts/migrate-pick-confirmed.ts",
     "backup:predictions": "tsx scripts/backup-predictions.ts",
@@ -19,7 +19,9 @@
     "icons:generate": "tsx scripts/generate-app-icons.ts",
     "restore:predictions": "tsx scripts/restore-predictions.ts",
     "merge:predictions-from-backup": "tsx scripts/merge-predictions-from-backup.ts",
-    "recalculate:scores": "tsx scripts/recalculate-scores.ts"
+    "recalculate:scores": "tsx scripts/recalculate-scores.ts",
+    "audit:points": "tsx scripts/audit-points.ts",
+    "audit:exacts": "tsx scripts/audit-exact-counts.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

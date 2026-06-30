@@ -1,3 +1,4 @@
+import type { LeaderboardEntry } from "./types";
 import type { PlayerPickSummary } from "./playerProfile";
 
 export interface PlayerPickStats {
@@ -7,7 +8,7 @@ export interface PlayerPickStats {
   decided: number;
 }
 
-/** Finished-match pick record — exact, correct winner (not exact), or wrong. */
+/** Finished-match pick record — scoring exact, correct winner (not exact), or wrong. */
 export function computePlayerPickStats(
   picks: PlayerPickSummary[]
 ): PlayerPickStats {
@@ -23,5 +24,19 @@ export function computePlayerPickStats(
     correct,
     wrong,
     decided: scored.length,
+  };
+}
+
+/** Profile header stats — always match leaderboard entry counts. */
+export function pickStatsFromLeaderboardEntry(
+  picks: PlayerPickSummary[],
+  entry: Pick<LeaderboardEntry, "exactScores" | "correctResults">
+): PlayerPickStats {
+  const decided = picks.filter((p) => p.status === "scored").length;
+  return {
+    exact: entry.exactScores,
+    correct: entry.correctResults - entry.exactScores,
+    wrong: Math.max(0, decided - entry.correctResults),
+    decided,
   };
 }

@@ -244,14 +244,93 @@ assert(
 
 assert(
   scoreMatchPrediction(
-    { ...koMatch, home_score: 2, away_score: 0, winner_team_id: "bra" },
+    {
+      ...koMatch,
+      stage: "round_of_32",
+      home_score: 1,
+      away_score: 1,
+      winner_team_id: "mar",
+      home_team_id: "bra",
+      away_team_id: "mar",
+      decided_by_penalties: true,
+    },
+    {
+      pred_home_score: 1,
+      pred_away_score: 2,
+      pred_winner_team_id: "bra",
+    }
+  ).points === 4,
+  "knockout non-tie scoreline overrides contradictory stored advancer on pens"
+);
+
+assert(
+  scoreMatchPrediction(
+    { ...koMatch, home_score: 0, away_score: 1, winner_team_id: "mar" },
     {
       pred_home_score: 2,
-      pred_away_score: 0,
-      pred_winner_team_id: "mar",
+      pred_away_score: 1,
+      pred_winner_team_id: "bra",
     }
   ).points === 0,
-  "knockout wrong advancer = 0 even if score close"
+  "knockout wrong advancer = 0 when predicted score favors other team"
+);
+
+const pensKoMatch: Match = {
+  ...koMatch,
+  stage: "round_of_32",
+  home_score: 1,
+  away_score: 1,
+  winner_team_id: "bra",
+  home_team_id: "bra",
+  away_team_id: "mar",
+  decided_by_penalties: true,
+  home_advance_bonus: 0,
+  away_advance_bonus: 0,
+};
+
+assert(
+  scoreMatchPrediction(pensKoMatch, {
+    pred_home_score: 2,
+    pred_away_score: 1,
+    pred_winner_team_id: null,
+  }).points === 4,
+  "knockout pens: non-tie pick with correct advancer earns base"
+);
+
+assert(
+  scoreMatchPrediction(pensKoMatch, {
+    pred_home_score: 0,
+    pred_away_score: 2,
+    pred_winner_team_id: null,
+  }).points === 0,
+  "knockout pens: non-tie pick with wrong advancer = 0"
+);
+
+assert(
+  scoreMatchPrediction(pensKoMatch, {
+    pred_home_score: 1,
+    pred_away_score: 1,
+    pred_winner_team_id: "bra",
+  }).points === 9,
+  "knockout pens: exact tie pick with correct advancer = 9"
+);
+
+assert(
+  scoreMatchPrediction(pensKoMatch, {
+    pred_home_score: 0,
+    pred_away_score: 0,
+    pred_winner_team_id: "bra",
+  }).points === 0,
+  "knockout pens: tie pick wrong score = 0"
+);
+
+assert(
+  scoreMatchPrediction(pensKoMatch, {
+    pred_home_score: 1,
+    pred_away_score: 1,
+    pred_winner_team_id: "mar",
+  }).points === 0,
+  "knockout pens: tie pick wrong advancer = 0"
 );
 
 const dayMatches: Match[] = [

@@ -1,8 +1,18 @@
 import { parseISO } from "date-fns";
 import type { Match } from "./types";
+import { isKnockoutStage } from "./types";
 
-/** Typical match length + stoppage (hours). */
-const IN_PLAY_HOURS = 2.5;
+/** Group stage: 90 min + stoppage. Knockout: extra time + penalties buffer. */
+const GROUP_IN_PLAY_HOURS = 2.5;
+const KNOCKOUT_IN_PLAY_HOURS = 4.5;
+/** Legacy name kept so stale dev bundles don't throw ReferenceError after hot reload. */
+const IN_PLAY_HOURS = GROUP_IN_PLAY_HOURS;
+
+function inPlayHoursForMatch(match: { stage?: Match["stage"] }): number {
+  return match.stage && isKnockoutStage(match.stage)
+    ? KNOCKOUT_IN_PLAY_HOURS
+    : GROUP_IN_PLAY_HOURS;
+}
 
 /** Match currently in progress with a live score. */
 export function isMatchLive(match: LiveScoreFields): boolean {
@@ -12,7 +22,9 @@ export function isMatchLive(match: LiveScoreFields): boolean {
 type LiveScoreFields = Pick<
   Match,
   "status" | "home_score" | "away_score" | "kickoff_at" | "home_team_id"
->;
+> & {
+  stage?: Match["stage"];
+};
 
 /** On the field now — live sync or within the kickoff window (not final). */
 export function isMatchCurrentlyPlaying(match: LiveScoreFields): boolean {
@@ -60,7 +72,7 @@ export function isMatchInPlayWindow(match: LiveScoreFields): boolean {
 
   const kickoff = parseISO(match.kickoff_at).getTime();
   const now = Date.now();
-  const end = kickoff + IN_PLAY_HOURS * 60 * 60 * 1000;
+  const end = kickoff + inPlayHoursForMatch(match) * 60 * 60 * 1000;
   return now >= kickoff && now <= end;
 }
 
@@ -72,7 +84,7 @@ export function matchNeedsScoreSync(
   match: Pick<
     Match,
     "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
-  >
+  > & { stage?: Match["stage"] }
 ): boolean {
   if (match.status === "final") return false;
   if (!match.kickoff_at || !match.home_team_id) return false;
@@ -85,10 +97,10 @@ export function matchNeedsScoreSync(
 }
 
 export function isAnyMatchNeedingScoreSync(
-  matches: Pick<
+  matches: (Pick<
     Match,
     "status" | "kickoff_at" | "home_score" | "away_score" | "home_team_id"
-  >[]
+  > & { stage?: Match["stage"] })[]
 ): boolean {
   return matches.some(matchNeedsScoreSync);
 }

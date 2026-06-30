@@ -34,9 +34,13 @@ import type {
   TournamentPodiumPrediction,
 } from "./types";
 import { canPickMatch } from "./utils";
-import { getStageLabel } from "./types";
+import { getStageLabel, isKnockoutStage } from "./types";
 import { syncLiveScores } from "./scores/sync";
-import { computePlayerPickStats, type PlayerPickStats } from "./playerPickStats";
+import {
+  computePlayerPickStats,
+  pickStatsFromLeaderboardEntry,
+  type PlayerPickStats,
+} from "./playerPickStats";
 import {
   buildLeaderboardProgression,
   type LeaderboardProgression,
@@ -91,6 +95,13 @@ export interface PlayerPickSummary {
   breakdownLines: string[];
   exactScore: boolean;
   correctResult: boolean;
+  /** Picked score equals final score (may still be a miss in knockout). */
+  scorelineMatch: boolean;
+  /** FIFA code of team that advanced (knockout pens / winner). */
+  actualWinnerCode: string | null;
+  decidedByPenalties: boolean;
+  /** Why a scoreline match did not earn points (knockout advancer, etc.). */
+  outcomeNote: string | null;
 }
 
 export interface PlayerPointsBreakdown {
@@ -397,6 +408,73 @@ export function computePlayerAchievements(
   return sortAchievements(achievements);
 }
 
+function pickOutcomeNote(
+  match: Match,
+  scorelineMatch: boolean,
+  exactScore: boolean,
+  correctResult: boolean,
+  predWinnerCode: string | null,
+  actualWinnerCode: string | null
+): string | null {
+  if (!scorelineMatch || exactScore || !isMatchDecidedForScoring(match)) {
+    return null;
+  }
+  if (isKnockoutStage(match.stage)) {
+    if (match.decided_by_penalties && actualWinnerCode && predWinnerCode) {
+      return `Picked ${predWinnerCode} to advance, but ${actualWinnerCode} won on penalties — not an exact pick`;
+    }
+    if (match.decided_by_penalties && actualWinnerCode) {
+      return `Score matched, but ${actualWinnerCode} advanced on penalties — not an exact pick`;
+    }
+    return "Score matched, but wrong advancing team — not an exact pick";
+  }
+  if (!correctResult) {
+    return "Does not count toward exact or correct picks";
+  }
+  return null;
+}
+
+/** Re-score finalized picks so profile flags match the leaderboard exactly. */
+export function syncPickScoringFlags(
+  picks: PlayerPickSummary[],
+  matches: Match[],
+  predictions: MatchPrediction[],
+  scoringConfig: ScoringConfig
+): void {
+  const predByMatch = new Map(predictions.map((p) => [p.match_id, p]));
+  const matchById = new Map(matches.map((m) => [m.id, m]));
+
+  for (const pick of picks) {
+    if (pick.status !== "scored") {
+      pick.exactScore = false;
+      pick.correctResult = false;
+      continue;
+    }
+    const match = matchById.get(pick.matchId);
+    const pred = predByMatch.get(pick.matchId);
+    if (!match || !pred) continue;
+    const effective = getEffectiveMatchPrediction(match, pred);
+    if (!effective) continue;
+    const result = scoreMatchPrediction(match, effective, scoringConfig);
+    pick.exactScore = result.exactScore;
+    pick.correctResult = result.correctResult;
+    pick.points = result.points;
+    pick.scorelineMatch =
+      match.home_score != null &&
+      match.away_score != null &&
+      effective.pred_home_score === match.home_score &&
+      effective.pred_away_score === match.away_score;
+    pick.outcomeNote = pickOutcomeNote(
+      match,
+      pick.scorelineMatch,
+      pick.exactScore,
+      pick.correctResult,
+      pick.predWinnerCode,
+      pick.actualWinnerCode
+    );
+  }
+}
+
 function pickStatus(match: Match): PlayerPickStatus {
   if (isMatchDecidedForScoring(match)) return "scored";
   if (hasDisplayableLiveScore(match) || isMatchInPlayWindow(match)) {
@@ -434,9 +512,21 @@ export function buildPlayerPickSummariesWithConfig(
     let breakdownLines: string[] = [];
     let exactScore = false;
     let correctResult = false;
+    const scorelineMatch =
+      match.home_score != null &&
+      match.away_score != null &&
+      effective.pred_home_score === match.home_score &&
+      effective.pred_away_score === match.away_score;
+
+    const actualWinnerCode =
+      match.winner_team_id === match.home_team_id
+        ? (match.home_team?.fifa_code ?? null)
+        : match.winner_team_id === match.away_team_id
+          ? (match.away_team?.fifa_code ?? null)
+          : null;
 
     if (decided && prediction) {
-      const result = scoreMatchPrediction(match, prediction, scoringConfig);
+      const result = scoreMatchPrediction(match, effective, scoringConfig);
       points = result.points;
       exactScore = result.exactScore;
       correctResult = result.correctResult;
@@ -444,12 +534,10 @@ export function buildPlayerPickSummariesWithConfig(
         breakdownLines = formatMatchScoreBreakdownLines(match, result);
       }
     } else if (liveScorable && prediction) {
-      const result = scoreMatchPrediction(match, prediction, scoringConfig, {
+      const result = scoreMatchPrediction(match, effective, scoringConfig, {
         allowLive: true,
       });
       livePoints = result.points;
-      exactScore = result.exactScore;
-      correctResult = result.correctResult;
       if (match.home_score != null && match.away_score != null) {
         breakdownLines = formatMatchScoreBreakdownLines(match, result);
       }
@@ -486,6 +574,17 @@ export function buildPlayerPickSummariesWithConfig(
       breakdownLines,
       exactScore,
       correctResult,
+      scorelineMatch,
+      actualWinnerCode,
+      decidedByPenalties: match.decided_by_penalties ?? false,
+      outcomeNote: pickOutcomeNote(
+        match,
+        scorelineMatch,
+        exactScore,
+        correctResult,
+        predWinnerCode,
+        actualWinnerCode
+      ),
     });
   }
 
@@ -571,6 +670,7 @@ export async function getPlayerProfileData(
     scoringConfig,
     leaderboardBundle.hasLiveScoring
   );
+  syncPickScoringFlags(picks, matches, playerPredictions, scoringConfig);
 
   const isOwnProfile = !viewerPlayerId || viewerPlayerId === playerId;
   const matchesById = new Map(matches.map((m) => [m.id, m]));
@@ -581,7 +681,18 @@ export async function getPlayerProfileData(
         return match != null && canRevealOtherPlayersPicks(match);
       });
 
-  const pickStats = computePlayerPickStats(picks);
+  const pickStats = pickStatsFromLeaderboardEntry(picks, entry);
+  if (process.env.NODE_ENV === "development") {
+    const computed = computePlayerPickStats(picks);
+    if (
+      computed.exact !== entry.exactScores ||
+      computed.exact + computed.correct !== entry.correctResults
+    ) {
+      console.error(
+        `Profile stats mismatch for ${player.display_name}: picks=${computed.exact}/${computed.exact + computed.correct} vs leaderboard=${entry.exactScores}/${entry.correctResults}`
+      );
+    }
+  }
   const leaderboardProgression = buildLeaderboardProgression(
     players,
     matches,

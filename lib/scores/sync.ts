@@ -50,11 +50,26 @@ export interface SyncLiveScoresResult {
 function inferWinnerTeamId(
   match: Pick<Match, "home_team_id" | "away_team_id" | "stage">,
   homeScore: number,
-  awayScore: number
+  awayScore: number,
+  overrideWinnerTeamId?: string | null
 ): string | null {
+  if (overrideWinnerTeamId) return overrideWinnerTeamId;
   if (homeScore > awayScore) return match.home_team_id;
   if (awayScore > homeScore) return match.away_team_id;
   if (isKnockoutStage(match.stage)) return null;
+  return null;
+}
+
+function resolveEspnWinnerTeamId(
+  match: Match,
+  winnerTeamName: string | null
+): string | null {
+  if (!winnerTeamName) return null;
+  const home = match.home_team;
+  const away = match.away_team;
+  if (!home || !away) return null;
+  if (teamNameMatches(winnerTeamName, home)) return match.home_team_id;
+  if (teamNameMatches(winnerTeamName, away)) return match.away_team_id;
   return null;
 }
 
@@ -127,21 +142,40 @@ async function applyScoreUpdate(
   homeScore: number,
   awayScore: number,
   completed: boolean,
-  syncedAt: string
+  syncedAt: string,
+  options?: {
+    winnerTeamId?: string | null;
+    decidedByPenalties?: boolean;
+  }
 ): Promise<"updated" | "finalized" | "skipped"> {
   const supabase = getSupabase();
-  const winnerTeamId = inferWinnerTeamId(match, homeScore, awayScore);
+  const winnerTeamId = inferWinnerTeamId(
+    match,
+    homeScore,
+    awayScore,
+    options?.winnerTeamId
+  );
+  const penaltyDecided =
+    options?.decidedByPenalties === true ||
+    (completed &&
+      isKnockoutStage(match.stage) &&
+      homeScore === awayScore &&
+      winnerTeamId != null);
 
   if (completed) {
+    const update: Record<string, unknown> = {
+      home_score: homeScore,
+      away_score: awayScore,
+      winner_team_id: winnerTeamId,
+      status: "final",
+      updated_at: syncedAt,
+    };
+    if (penaltyDecided) {
+      update.decided_by_penalties = true;
+    }
     const { error } = await supabase
       .from("matches")
-      .update({
-        home_score: homeScore,
-        away_score: awayScore,
-        winner_team_id: winnerTeamId,
-        status: "final",
-        updated_at: syncedAt,
-      })
+      .update(update)
       .eq("id", match.id);
     if (error) {
       console.error(
@@ -221,12 +255,21 @@ async function syncFromEspn(
       liveClockByMatchId[match.id] = event.liveClockDisplay;
     }
 
+    const espnWinnerTeamId = resolveEspnWinnerTeamId(
+      match,
+      event.winnerTeamName
+    );
+
     const result = await applyScoreUpdate(
       match,
       event.homeScore,
       event.awayScore,
       event.completed,
-      syncedAt
+      syncedAt,
+      {
+        winnerTeamId: espnWinnerTeamId,
+        decidedByPenalties: event.decidedByPenalties,
+      }
     );
 
     if (result === "finalized") {
@@ -595,20 +638,34 @@ export async function reconcileRecentFinalScores(): Promise<ReconcileFinalScores
       continue;
     }
 
+    const espnWinnerTeamId = resolveEspnWinnerTeamId(
+      match,
+      event.winnerTeamName
+    );
     const winnerTeamId = inferWinnerTeamId(
       match,
       event.homeScore,
-      event.awayScore
+      event.awayScore,
+      espnWinnerTeamId
     );
+    const penaltyDecided =
+      event.decidedByPenalties ||
+      (isKnockoutStage(match.stage) &&
+        event.homeScore === event.awayScore &&
+        winnerTeamId != null);
+    const update: Record<string, unknown> = {
+      home_score: event.homeScore,
+      away_score: event.awayScore,
+      winner_team_id: winnerTeamId,
+      status: "final",
+      updated_at: syncedAt,
+    };
+    if (penaltyDecided) {
+      update.decided_by_penalties = true;
+    }
     const { error } = await supabase
       .from("matches")
-      .update({
-        home_score: event.homeScore,
-        away_score: event.awayScore,
-        winner_team_id: winnerTeamId,
-        status: "final",
-        updated_at: syncedAt,
-      })
+      .update(update)
       .eq("id", match.id);
 
     if (error) {
