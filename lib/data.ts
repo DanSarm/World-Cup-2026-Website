@@ -169,15 +169,40 @@ export async function getMatchesWithTeamsFresh(): Promise<Match[]> {
   return loadMatchesWithTeams();
 }
 
-async function loadPredictions(playerId?: string): Promise<MatchPrediction[]> {
+/** Supabase caps unbounded selects at 1000 rows — paginate so leaderboard sees every pick. */
+const PREDICTIONS_PAGE_SIZE = 1000;
+
+async function fetchAllPredictionsFromDb(): Promise<MatchPrediction[]> {
   const supabase = getSupabase();
-  let query = supabase.from("match_predictions").select("*");
-  if (playerId) query = query.eq("player_id", playerId);
-  const { data } = await query;
-  return (data ?? []) as MatchPrediction[];
+  const rows: MatchPrediction[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("match_predictions")
+      .select("*")
+      .order("id")
+      .range(offset, offset + PREDICTIONS_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as MatchPrediction[];
+    rows.push(...page);
+    if (page.length < PREDICTIONS_PAGE_SIZE) break;
+    offset += PREDICTIONS_PAGE_SIZE;
+  }
+
+  return rows;
 }
 
-export const getPredictions = cache(loadPredictions);
+const getAllPredictionsCached = cache(fetchAllPredictionsFromDb);
+
+/** All pool predictions (paginated). Pass playerId to filter after load — same source as leaderboard. */
+export async function getPredictions(
+  playerId?: string
+): Promise<MatchPrediction[]> {
+  const all = await getAllPredictionsCached();
+  if (!playerId) return all;
+  return all.filter((p) => p.player_id === playerId);
+}
 
 export async function getConfirmedMatchPicks(
   matchId: string

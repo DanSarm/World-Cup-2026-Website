@@ -527,7 +527,7 @@ export function LeaderboardProgressionChart({
                       filter={`url(#${uid}-glow)`}
                     >
                       <title>
-                        {player.displayName || "Player"} points over time
+                        {`${player.displayName || "Player"} points over time`}
                       </title>
                     </path>
                     <path
@@ -541,7 +541,7 @@ export function LeaderboardProgressionChart({
                       opacity={0.9}
                     >
                       <title>
-                        {player.displayName || "Player"} place over time
+                        {`${player.displayName || "Player"} place over time`}
                       </title>
                     </path>
                   </>
@@ -557,8 +557,7 @@ export function LeaderboardProgressionChart({
                     opacity={lineOpacity}
                   >
                     <title>
-                      {player.displayName || "Player"}:{" "}
-                      {player.data[player.data.length - 1]?.points ?? 0} pts now
+                      {`${player.displayName || "Player"}: ${player.data[player.data.length - 1]?.points ?? 0} pts now`}
                     </title>
                   </path>
                 )}
@@ -588,7 +587,7 @@ export function LeaderboardProgressionChart({
                   >
                     {firstName(player.displayName)}
                     <title>
-                      {player.displayName}: {lastPoints} pts
+                      {`${player.displayName}: ${lastPoints} pts`}
                     </title>
                   </text>
                 </g>

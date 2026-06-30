@@ -21,7 +21,8 @@
     "merge:predictions-from-backup": "tsx scripts/merge-predictions-from-backup.ts",
     "recalculate:scores": "tsx scripts/recalculate-scores.ts",
     "audit:points": "tsx scripts/audit-points.ts",
-    "audit:exacts": "tsx scripts/audit-exact-counts.ts"
+    "audit:exacts": "tsx scripts/audit-exact-counts.ts",
+    "audit:predictions": "tsx scripts/audit-prediction-fetch.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
